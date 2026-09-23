@@ -1,8 +1,10 @@
 # B6 — Team proposals and manual business decisions
 
+**Priority: P0 — top priority for proposal submission and manual Select / Reject.** Source: [MVP_SPEC.md](../../MVP_SPEC.md) §§2, 6.5, 7.
+
 ## Goal
 
-Let any valid team propose on any published task, then let only the owning business compare, select, reject, or reset proposals. No automatic assignment or AI team choice.
+Let any valid team propose on any published task, then let only the owning business compare and manually select or reject proposals. Decision Reset is P1. No automatic assignment or AI team choice.
 
 ## Starting point and files
 
@@ -12,7 +14,7 @@ Let any valid team propose on any published task, then let only the owning busin
 
 - `PUT /api/tasks/{taskId}/proposals/mine`: team actor only; accept idea (20–2000), plan (20–3000), timeline (3–200), and optional valid HTTP(S) prototype URL. Team ID comes from actor headers, not the request. Upsert one proposal per team/task while status is `pending`; retries update that record rather than creating duplicates. No cap on different teams.
 - `GET /api/tasks/{taskId}/proposals`: owning business only, return all proposals with team name/tags and decision state. `GET /api/proposals/mine`: team only, return its proposals and task titles.
-- `POST /api/proposals/{proposalId}/decision`: owning business only; accept `selected|rejected|pending` and optional reason. Manual selection of zero, one, or several teams is valid. Return `409` for illegal state/revision; do not assign a team automatically.
+- `POST /api/proposals/{proposalId}/decision`: owning business only; P0 accepts `selected|rejected` and an optional reason. Manual selection of zero, one, or several teams is valid. P1 adds Reset to `pending` before any milestone; the full spec allows transitions between selected and rejected until a milestone. Return `409` for illegal state/revision; do not assign a team automatically.
 - Keep `proposalCount` accurate for catalog display using a transaction or derive it from the proposal query; do not let retries inflate it. Hide the scaffold's unimplemented milestone and leaderboard routes for this mandatory-demo scope.
 
 ## Acceptance
@@ -21,4 +23,4 @@ Let any valid team propose on any published task, then let only the owning busin
 
 ## Boundary
 
-Do not implement milestone points, leaderboard, recommendations, AI matching, or frontend forms. B6 owns proposal HTTP behavior and decision logic.
+Do not implement milestone points, leaderboard, recommendations, AI matching, or frontend forms in P0. B6 owns proposal HTTP behavior and decision logic; milestones and leaderboard are P2.

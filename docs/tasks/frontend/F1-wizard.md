@@ -1,5 +1,7 @@
 # F1 — New Task Wizard (Steps 1–5)
 
+**Priority: P0 — top priority.** Source: [MVP_SPEC.md](../../../MVP_SPEC.md) §§2, 5.2, 6.1–6.2, 8.2.
+
 Spec: MVP_SPEC.md §8.2 (B2), §5.2, §6.1, §6.2.
 
 ## Goal
@@ -9,21 +11,23 @@ The business-side draft → analyze → clarify → card → confirm → publish
 - `web/src/pages/business/NewTaskWizard.tsx` (route `/business/tasks/new` → `/business/tasks/:id/wizard`)
 - `web/src/components/wizard/Stepper.tsx` — 5-step header (Draft → Clarify → Card → Rating → Publish)
 - `web/src/components/wizard/DraftStep.tsx` — textarea (20–4000 chars), industry select, **Analyze** button → `POST /tasks` then `POST /tasks/{id}/analyze`; loading state "Analyzing your description…"
-- `web/src/components/wizard/ClarifyStep.tsx` — Coach panel: 3–7 question cards, each with question text, field label, up to 4 chips (click inserts editable text) + free-text answer box; separate suggestions list; stub banner "AI unavailable — basic questions; you can continue editing." when `source==='stub'`; **Apply answers** → `PUT /tasks/{id}/answers`
-- `web/src/components/wizard/CardStep.tsx` — two-column: editable form (all §4.1 fields incl. tag inputs for `topics`/`techTags`) left, Coach/RatingPanel preview right; draft extracts shown with evidence + explicit **Use** button (never auto-inserted, `PUT /tasks/{id}/fields` on use); quest **Add details** focuses the named field; **Confirm & score** → `POST /tasks/{id}/confirm`
-- `web/src/components/wizard/RatingStep.tsx` — previous vs current confirmed score, delta, before/after level, level-up notice only on threshold cross; **Improve** (back to Card step) / **Publish** (`POST /tasks/{id}/publish`)
+- `web/src/components/wizard/ClarifyStep.tsx` — Coach panel: 3–7 question cards, each with question text, field label, up to 4 chips (click inserts editable text) + free-text answer box; separate suggestions list; stub banner "AI unavailable — basic questions; you can continue editing." when `source==='stub'`; **Apply answers** → one atomic `PUT /tasks/{id}/answers`. After Apply, show the answers read-only, disable Apply, and send further changes to the card editor. A retry of the identical payload is safe; a different payload gets `409`.
+- `web/src/components/wizard/CardStep.tsx` — two-column: editable form (all §4.1 fields incl. tag inputs for `topics`/`techTags`) left, Coach/RatingPanel showing the current confirmed rating and quests right; draft extracts and suggested title shown with evidence and explicit **Use**/review action (never silently confirmed); quest **Add details** focuses the named field; **Confirm & score** → `POST /tasks/{id}/confirm`. P1 may add an explicitly labeled unsaved rating preview.
+- `web/src/components/wizard/RatingStep.tsx` — previous vs current confirmed score, delta, breakdown, quests, before/after level, and level-up notice only on threshold cross; **Improve** (back to Card step for a second edit and confirm in P0) / **Publish** (`POST /tasks/{id}/publish`)
 - `web/src/components/wizard/PublishedStep.tsx` — confirmation message, catalog position, link to task detail
 
 ## Depends on
 - F2 (RatingPanel component) — reuse it inside CardStep/RatingStep rather than duplicating.
 - Generated client for `/tasks`, `/tasks/{id}/analyze`, `/tasks/{id}/answers`, `/tasks/{id}/fields`, `/tasks/{id}/confirm`, `/tasks/{id}/publish`.
 
-## Acceptance checks (manual — S3, S4, S5, S7)
+## Acceptance checks (manual — S3, S4, S5, S7, S16)
 - Weak draft → Analyze produces 3–7 questions, ≤4 chips each.
 - Selecting a chip inserts editable text into the answer box (not read-only).
 - Apply answers fills the correct card fields; user-written text vs AI-derived text is visually distinguishable (provenance).
+- Repeating the identical Apply leaves fields and revision unchanged; changing an applied answer produces `409` and directs the user to edit the card.
 - Confirm shows score/breakdown/quests; Publish only enabled once title is non-empty and rating exists.
-- Preview (unconfirmed) is clearly labeled "Preview — confirm to update your rating" and never shown as awarded.
+- A second edit and confirm within the initial wizard changes the confirmed score and shows the actual before/after delta and a level-up notice only if a threshold was crossed. Publish is blocked while changes are unconfirmed.
+- If P1 preview is built, it reads "Preview — confirm to update your rating" and never appears as awarded.
 
 ## Do not touch
 - `web/src/api/**` (generated).

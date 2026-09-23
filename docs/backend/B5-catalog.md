@@ -1,5 +1,7 @@
 # B5 — Ranked open catalog
 
+**Priority: P0 — top priority.** Source: [MVP_SPEC.md](../../MVP_SPEC.md) §§2, 6.3, 7.
+
 ## Goal
 
 Make every **published** task visible to every team, sorted by confirmed readiness score, with topic and readiness filters. The catalog must never expose unconfirmed business edits.
@@ -11,9 +13,9 @@ Make every **published** task visible to every team, sorted by confirmed readine
 ## Implement
 
 - `GET /api/catalog?topic=&level=` loads published tasks, uses `confirmed.fields` and confirmed rating only, and sorts `rating.total` descending, then `confirmedAt` descending, then task ID. Assign the 1-based catalog position **before** filtering; include total published count so `#n of m` remains stable across filters.
-- Accept topic case-insensitively and level values `draft|workable|ready|priority`; return validation errors for unknown levels. `GET /api/catalog/topics` lists distinct confirmed topics. Keep the in-memory approach for the small demo dataset.
+- Accept repeated `topic` and `level` query values for the §8.3 multi-select UI (for example `?topic=retail&topic=logistics&level=workable`). Match any selected topic case-insensitively and any selected level in `draft|workable|ready|priority`; combine the topic and level groups with AND. Return validation errors for unknown levels. `GET /api/catalog/topics` lists distinct confirmed topics. Apply filters after ranking and position assignment. Freeze this query shape in B0's OpenAPI contract. Keep the in-memory approach for the small demo dataset.
 - Return title, short summary from confirmed context/need, business name, score, level, topics/tech tags, proposal count, position, and priority flag. Draft-level tasks are still visible and may receive proposals.
-- Preserve a read route for the full confirmed card (`GET /api/tasks/{id}` from B4); catalog items link to it. The recommendations route currently in the scaffold is outside this selected scope: unmap it or return an explicit unavailable response, never an empty success that implies functionality.
+- Preserve a read route for the full confirmed card (`GET /api/tasks/{id}` from B4); catalog items link to it. Recommendations are P1: unmap the unfinished route or return an explicit unavailable response until implemented, never an empty success that implies functionality.
 
 ## Acceptance
 

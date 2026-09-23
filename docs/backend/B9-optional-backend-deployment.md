@@ -1,5 +1,7 @@
 # B9 — Optional Cloud Run backend deployment
 
+**Priority: P2 — optional after the P0 journey and P1 work are stable.** Source: [MVP_SPEC.md](../../MVP_SPEC.md) §§2, 10.
+
 ## Goal
 
 Prepare and, if separately authorized, deploy the backend API to Cloud Run after the local mandatory flow is stable. This is a stretch brief; the demo can run entirely from Docker Compose.

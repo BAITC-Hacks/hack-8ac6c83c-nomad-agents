@@ -1,5 +1,7 @@
 # B3 — Deterministic readiness engine and quests
 
+**Priority: P0 — top priority.** Source: [MVP_SPEC.md](../../MVP_SPEC.md) §§2, 4.2–4.3, 5.3.
+
 ## Goal
 
 Implement MVP spec §§4.2–4.3 and 5.3 as backend code. The score must depend only on confirmed card fields and a versioned ruleset, never on an AI response. B4 calls this service during confirmation; B7 uses it while seeding.
@@ -8,7 +10,7 @@ Implement MVP spec §§4.2–4.3 and 5.3 as backend code. The score must depend 
 
 `api/Domain/Rating.cs` has levels but stale `ai|stub` score sources and no `matchedSignals`/quests/rules version. `api/Features/Rating/` contains DTOs and an empty endpoint mapper. Add `RatingService` and rule helpers there; coordinate any domain shape changes with B1. No standalone score endpoint is needed.
 
-## Version `v1` rules
+## Version `en-mvp-1` rules
 
 Normalize Unicode whitespace/case; fewer than three non-space characters counts as empty. Award each criterion `0`, `floor(weight/2)`, or full weight. Use conservative, explicit signal detectors and record their IDs in `matchedSignals`. Initial detector vocabulary only needs to cover the prepared English demo; unsupported wording remains half credit with a clear reason, not an AI guess. Keep terms/patterns centralized and version them when changed.
 
@@ -22,7 +24,7 @@ Normalize Unicode whitespace/case; fewer than three non-space characters counts 
 | Users / 10 | Empty | User group named | Group plus count, role, or usage situation; e.g. `12 dispatchers` |
 | Business connection / 10 | Both empty | Contact or interaction present | Contact plus consultation channel/cadence **and** feedback procedure |
 
-Map each missing signal to a plain-language `reason` and quest. Return seven ordered breakdown rows, `total`, level (0–39 draft, 40–69 workable, 70–89 ready, 90–100 priority), next threshold, and quests ordered by `potentialPoints = weight - score`. Quest points are ceilings, not guarantees. Cache by canonical confirmed fields plus `ratingRulesVersion`; identical inputs yield identical results in live and stub AI modes. A repeated confirmation may reuse the result without another history entry.
+Map each missing signal to a plain-language `reason` and quest. Return seven ordered breakdown rows, `total`, level (0–39 draft, 40–69 workable, 70–89 ready, 90–100 priority), next threshold, and quests ordered by `potentialPoints = weight - score`. Quest points are ceilings, not guarantees. Cache by canonical confirmed fields plus `ratingRulesVersion = en-mvp-1`; identical inputs yield identical results in live and stub AI modes. A repeated confirmation may reuse the result without another history entry. The P0 wizard must support a second confirm and show actual score/level delta; a level-up notice appears only when a threshold is crossed.
 
 ## Acceptance
 

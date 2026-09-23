@@ -1,6 +1,8 @@
 # F5 — Leaderboard
 
-Spec: MVP_SPEC.md §8.3 (T4), §6.6. Cut-list item #4 (keep confirmed points on team badge if cut).
+**Priority: P2 — optional after the complete P0 flow.** Source: [MVP_SPEC.md](../../../MVP_SPEC.md) §§2, 6.6, 8.3.
+
+Spec: MVP_SPEC.md §8.3 (T4), §6.6.
 
 ## Goal
 Simple points leaderboard, lowest priority of the frontend tasks.
