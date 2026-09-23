@@ -2,6 +2,8 @@
 .env
 .env.local
 *.local
+credentials.json
+*service-account*.json
 
 # IDE
 .vscode/

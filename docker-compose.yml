@@ -3,26 +3,24 @@ services:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     command: gcloud emulators firestore start --host-port=0.0.0.0:8080 --project=taskforge-local
     ports:
-      - "8081:8080"
+      - "${FIRESTORE_HOST_PORT:-8081}:8080"
     environment:
       CLOUDSDK_CORE_PROJECT: taskforge-local
 
   api:
     build: ./api
-    env_file: .env
     environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       FIRESTORE_EMULATOR_HOST: firestore:8080
       GCP_PROJECT_ID: taskforge-local
-      GOOGLE_CLOUD_PROJECT: taskforge-local
-      GCLOUD_PROJECT: taskforge-local
-      GOOGLE_APPLICATION_CREDENTIALS: /app/credentials.json
     ports:
-      - "8080:8080"
+      - "${API_HOST_PORT:-8080}:8080"
     depends_on:
       - firestore
     volumes:
       - ./seed:/app/seed:ro
-      - ./credentials.json:/app/credentials.json:ro
 
   web:
     image: node:22-alpine
@@ -31,7 +29,7 @@ services:
     environment:
       VITE_API_BASE_URL: http://localhost:8080
     ports:
-      - "5173:5173"
+      - "${WEB_HOST_PORT:-5173}:5173"
     volumes:
       - ./web:/app
       - /app/node_modules
