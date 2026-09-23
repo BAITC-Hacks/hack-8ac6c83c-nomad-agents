@@ -12,7 +12,7 @@ const levels: { value: ReadinessLevel; label: string }[] = [
   { value: "priority", label: "Priority" },
 ];
 
-interface Recommendation { task: CatalogTask; matchedTags: string[] }
+interface Recommendation { task: CatalogTask; matchedTags?: string[]; matched?: string[] }
 
 function normalizeCatalog(data: CatalogResponse | CatalogTask[]): CatalogResponse {
   return Array.isArray(data) ? { items: data, total: data.length } : data;
@@ -86,10 +86,10 @@ export default function Catalog() {
         <section aria-label={`Recommended for ${teamName}`} style={{ border: "1px solid #bfdbfe", borderRadius: 14, background: "#eff6ff", padding: "1rem", marginBottom: "1.5rem" }}>
           <h2 style={{ margin: "0 0 0.8rem", fontSize: "1.15rem" }}>Recommended for {teamName}</h2>
           <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
-            {recommendationTasks.map(({ task, matchedTags }) => <article key={task.id} style={{ padding: "0.8rem", borderRadius: 10, background: "white", border: "1px solid #dbeafe" }}>
+            {recommendationTasks.map(({ task, matchedTags, matched }) => <article key={task.id} style={{ padding: "0.8rem", borderRadius: 10, background: "white", border: "1px solid #dbeafe" }}>
               <a href={`/catalog/${encodeURIComponent(task.id)}`} style={{ fontWeight: 700, color: "#1d4ed8" }}>{task.title}</a>
               <p style={{ margin: "0.4rem 0", color: "#475569", fontSize: "0.9rem" }}>{task.businessName}</p>
-              <p style={{ margin: 0, color: "#475569", fontSize: "0.85rem" }}>Matches your tags: {matchedTags.join(", ") || "Related interests"}</p>
+              <p style={{ margin: 0, color: "#475569", fontSize: "0.85rem" }}>Matches your tags: {(matchedTags ?? matched ?? []).join(", ") || "Related interests"}</p>
             </article>)}
           </div>
         </section>

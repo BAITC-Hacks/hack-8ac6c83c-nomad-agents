@@ -1,89 +1,59 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "./components/AppShell";
 import { RoleSwitcher } from "./components/RoleSwitcher";
-import { useActor } from "./lib/actor";
-import { apiFetch } from "./lib/http";
 import { Toaster } from "./components/Toaster";
+import { useActor } from "./lib/actor";
+import { apiFetch, DEMO_EVENT, isDemoMode } from "./lib/http";
+import NewTaskWizard from "./pages/business/NewTaskWizard";
+import MyTasks from "./pages/business/MyTasks";
+import TaskDetail from "./pages/business/TaskDetail";
+import Catalog from "./pages/Catalog";
+import TaskView from "./pages/team/TaskView";
+import ProposalForm from "./components/ProposalForm";
+import ProposalReview from "./components/ProposalReview";
+import MyProposals from "./pages/team/MyProposals";
+import Leaderboard from "./pages/Leaderboard";
+import AiLogs from "./pages/AiLogs";
 
 export interface ActorsDto {
   businesses: { id: string; name: string; industry?: string; contactName?: string }[];
   teams: { id: string; name: string }[];
 }
-
-const routes = {
-  "/business/tasks": { title: "My tasks", description: "Your business tasks will appear here." },
-  "/business/tasks/new": { title: "New task", description: "Start a task draft to work with the AI Challenge Coach." },
-  "/catalog": { title: "Task catalog", description: "Browse published tasks and their readiness scores." },
-  "/team/proposals": { title: "My proposals", description: "Track the proposals submitted by your team." },
-} as const;
-
-function resolvePage(path: string) {
-  const fixed = routes[path as keyof typeof routes];
-  if (fixed) return fixed;
-  if (/^\/business\/tasks\/[^/]+(?:\/wizard)?$/.test(path)) return { title: "Task details", description: "Review the confirmed task card, readiness score, and team proposals." };
-  if (/^\/catalog\/[^/]+$/.test(path)) return { title: "Task details", description: "Review this published task and prepare a proposal." };
-  if (path === "/leaderboard") return { title: "Leaderboard", description: "Team points and standings will appear here." };
-  if (path === "/ai-logs") return { title: "AI logs", description: "Analyze requests and validation results will appear here." };
-  return undefined;
-}
-
 function usePath() {
-  const [path, setPath] = useState(() => window.location.pathname);
-  useEffect(() => {
-    const onPopState = () => setPath(window.location.pathname);
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
-  const navigate = useCallback((next: string) => {
-    if (next !== window.location.pathname) window.history.pushState({}, "", next);
-    setPath(next);
-  }, []);
+  const [path, setPath] = useState(location.pathname);
+  useEffect(() => { const listener = () => setPath(location.pathname); addEventListener("popstate", listener); return () => removeEventListener("popstate", listener); }, []);
+  const navigate = useCallback((next: string) => { if (next !== location.pathname) history.pushState({}, "", next); setPath(next); }, []);
   return [path, navigate] as const;
 }
-
 export default function App() {
   const { actor } = useActor();
   const [actors, setActors] = useState<ActorsDto | null>(null);
-  const [actorsError, setActorsError] = useState("");
+  const [error, setError] = useState("");
   const [path, navigate] = usePath();
-
+  const [demo, setDemo] = useState(isDemoMode());
+  useEffect(() => { const update = () => setDemo(isDemoMode()); addEventListener(DEMO_EVENT, update); return () => removeEventListener(DEMO_EVENT, update); }, []);
+  useEffect(() => { apiFetch<ActorsDto>("/api/actors").then(setActors).catch(() => setError("Profiles could not be loaded.")); }, []);
   useEffect(() => {
-    apiFetch<ActorsDto>("/api/actors")
-      .then((data) => { setActors(data); setActorsError(""); })
-      .catch(() => setActorsError("Could not load businesses and teams. Check that the API is running, then reload."));
-  }, []);
-
-  const activePath = useMemo(() => {
-    const pageAtPath = resolvePage(path);
-    const isBusinessRoute = path.startsWith("/business/");
-    if (pageAtPath && actor && isBusinessRoute === (actor.role === "business")) return path;
-    if (!actor && pageAtPath) return path;
-    return actor?.role === "business" ? "/business/tasks" : "/catalog";
-  }, [actor, path]);
-  const page = resolvePage(activePath);
-
-  useEffect(() => {
-    if (resolvePage(path) !== undefined && actor && path !== activePath) navigate(activePath);
-    else if (!resolvePage(path) && actor) navigate(activePath);
-  }, [actor, activePath, navigate, path]);
-
-  return <>
-    <AppShell actor={actor} path={activePath} navigate={navigate} roleSwitcher={<RoleSwitcher actors={actors} error={actorsError} />}>
-      {!actor ? (
-        <section className="welcome-card">
-          <span className="eyebrow">WELCOME TO TASKFORGE</span>
-          <h1>Choose who you are</h1>
-          <p>Select a business or student team to open your workspace.</p>
-        </section>
-      ) : page ? (
-        <section className="page-card">
-          <span className="eyebrow">{actor.role === "business" ? "BUSINESS WORKSPACE" : "TEAM WORKSPACE"}</span>
-          <h1>{page.title}</h1>
-          <p>{page.description}</p>
-          <div className="integration-note">This page is ready for its feature module to be connected.</div>
-        </section>
-      ) : null}
-    </AppShell>
-    <Toaster />
-  </>;
+    if (!actor) return;
+    if (path === "/" || (actor.role === "business" && (path.startsWith("/team/") || path.startsWith("/catalog/"))) || (actor.role === "team" && path.startsWith("/business/"))) navigate(actor.role === "business" ? "/business/tasks" : "/catalog");
+  }, [actor, path, navigate]);
+  const ownerId = /^\/business\/tasks\/([^/]+)$/.exec(path)?.[1];
+  const wizardId = /^\/business\/tasks\/([^/]+)\/wizard$/.exec(path)?.[1];
+  const catalogId = /^\/catalog\/([^/]+)$/.exec(path)?.[1];
+  let page = <section className="welcome-card"><span className="eyebrow">WELCOME TO TASKFORGE</span><h1>Choose who you are</h1><p>Select a business or team to open the workspace.</p></section>;
+  if (actor) {
+    if (path === "/business/tasks") page = <MyTasks />;
+    else if (path === "/business/tasks/new" || wizardId) page = <NewTaskWizard taskId={wizardId} onCreated={id => navigate(`/business/tasks/${id}/wizard`)} />;
+    else if (ownerId) page = <TaskDetail key={actor.actorId} taskId={ownerId} renderProposals={task => <ProposalReview taskId={task.id} />} />;
+    else if (path === "/catalog") page = <Catalog />;
+    else if (catalogId) page = <TaskView key={actor.actorId} taskId={catalogId} renderProposalForm={({ task, proposal, readOnly }) => <ProposalForm key={proposal?.id ?? `${actor.actorId}:new`} taskId={task.id} proposal={proposal} readOnly={readOnly} />} />;
+    else if (path === "/team/proposals") page = <MyProposals />;
+    else if (path === "/leaderboard") page = <Leaderboard />;
+    else if (path === "/ai-logs") page = <AiLogs />;
+    else page = <section className="page-card"><h1>Page not found</h1><a href={actor.role === "business" ? "/business/tasks" : "/catalog"}>Return to workspace</a></section>;
+  }
+  return <><AppShell actor={actor} path={path} navigate={navigate} roleSwitcher={<RoleSwitcher actors={actors} error={error} />}>
+    {demo && <div className="demo-banner" role="status"><strong>Sample workspace</strong> · API unavailable. Data and sample scores are stored only in this browser; they are not official ratings.</div>}
+    {page}
+  </AppShell><Toaster /></>;
 }

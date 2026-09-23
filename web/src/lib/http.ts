@@ -1,7 +1,17 @@
 import type { Actor } from "./actor";
+import { demoRequest } from "./demo";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 const STORAGE_KEY = "taskforge.actor";
+export const DEMO_EVENT = "taskforge:demo-mode";
+let demoMode = false;
+export function isDemoMode() { return demoMode; }
+function enableDemo() {
+  if (!demoMode) {
+    demoMode = true;
+    window.dispatchEvent(new Event(DEMO_EVENT));
+  }
+}
 
 function currentActor(): Actor | null {
   try {
@@ -42,13 +52,27 @@ export class ApiError extends Error {
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const actor = currentActor();
   const headers = new Headers(init.headers);
-  headers.set("Content-Type", "application/json");
+  if (init.body != null && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (actor) {
     headers.set("X-Actor-Role", actor.role);
     headers.set("X-Actor-Id", actor.actorId);
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+  if (demoMode) return demoRequest<T>(path, init.method ?? "GET", init.body, actor);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+  } catch {
+    enableDemo();
+    return demoRequest<T>(path, init.method ?? "GET", init.body, actor);
+  }
+
+  // The scaffold API only exposes health. A missing actors route means its
+  // application contract is unavailable, so use one coherent local dataset.
+  if (path === "/api/actors" && (res.status === 404 || res.status === 501)) {
+    enableDemo();
+    return demoRequest<T>(path, init.method ?? "GET", init.body, actor);
+  }
 
   if (!res.ok) {
     let problem: ProblemDetails = {};

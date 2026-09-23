@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import type { Actor } from "../lib/actor";
 
 const links = {
-  business: [{ path: "/business/tasks", label: "My tasks" }, { path: "/business/tasks/new", label: "New task" }],
-  team: [{ path: "/catalog", label: "Catalog" }, { path: "/team/proposals", label: "My proposals" }],
+  business: [{ path: "/business/tasks", label: "My tasks" }, { path: "/business/tasks/new", label: "New task" }, { path: "/catalog", label: "Catalog" }, { path: "/ai-logs", label: "AI logs" }, { path: "/leaderboard", label: "Leaderboard" }],
+  team: [{ path: "/catalog", label: "Catalog" }, { path: "/team/proposals", label: "My proposals" }, { path: "/leaderboard", label: "Leaderboard" }, { path: "/ai-logs", label: "AI logs" }],
 };
 
 export function AppShell({ actor, path, navigate, roleSwitcher, children }: {
