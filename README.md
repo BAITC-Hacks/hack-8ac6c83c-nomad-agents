@@ -4,6 +4,8 @@ Hackathon project by team Nomad Agents. Full target design lives in [`MVP_SPEC.m
 
 <img width="1919" height="878" alt="TaskForge screenshot" src="https://github.com/user-attachments/assets/708a63d3-ff99-4ddc-b5bb-7626addd85c7" />
 
+https://taskforge-web.netlify.app/
+
 ## 1. Project name
 
 **TaskForge** — "AI Challenge Coach: Business Task Readiness & Open Team Selection".
