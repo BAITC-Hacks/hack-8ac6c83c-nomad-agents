@@ -31,7 +31,6 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddOpenApi();
-builder.Services.AddSwaggerGen();
 
 // Firestore
 builder.Services.AddSingleton(FirestoreDb.Create(gcpProjectId));
@@ -53,8 +52,6 @@ var app = builder.Build();
 // Middleware
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
     app.MapOpenApi();
 }
 
