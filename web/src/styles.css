@@ -36,6 +36,27 @@ button, select { font: inherit; }
 .toast strong { color: #263044; font-size: 13px; }
 .toast small { margin-top: 5px; color: #727c8d; font-size: 12px; line-height: 1.45; }
 .toast button { margin: -4px -4px 0 auto; border: 0; background: transparent; color: #81899a; font-size: 21px; cursor: pointer; }
+.demo-banner { max-width: 1080px; margin: 0 auto 18px; padding: 12px 16px; border: 1px solid #f5d58a; border-radius: 10px; background: #fffbeb; color: #805c0a; font-size: 13px; }
+.content-page { max-width: 1000px; margin: auto; }
+.content-page h1 { margin-top: 0; }
+.content-page input, .proposal-form input, .proposal-form textarea, .review input { width: 100%; margin: 6px 0 13px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
+.proposal-form label, .review label { display: block; font-weight: 600; font-size: 14px; }
+.proposal-form textarea { resize: vertical; }
+.review-list, .proposal-list, .log-list { display: grid; gap: 14px; }
+.review-card { padding: 20px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; }
+.review-heading, .review-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.review-heading { justify-content: space-between; }.review-heading h2, .review-heading h3 { margin: 0; }
+.review-card dt { font-weight: 700; margin-top: 10px; }.review-card dd { margin: 3px 0 8px; white-space: pre-wrap; }
+.review-actions button, .milestone-form button { padding: 9px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; cursor: pointer; }
+.review-actions button:first-child { background: #2563eb; color: white; border-color: #2563eb; }
+.review-actions button:disabled, .milestone-form button:disabled { opacity: .5; cursor: default; }
+.status { display: inline-block; padding: 4px 10px; border-radius: 20px; background: #f1f5f9; text-transform: capitalize; font-size: 12px; font-weight: 700; }
+.status-selected { background: #dcfce7; color: #166534; }.status-rejected { background: #fee2e2; color: #991b1b; }
+.milestone-form { margin-top: 14px; padding: 12px; background: #f8fafc; border-radius: 8px; }
+.log-list summary { cursor: pointer; font-weight: 700; }.log-list pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; background: #f8fafc; border-radius: 8px; }
+.owner-editor { margin: 16px 0; padding: 20px; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc; }
+.owner-editor label { display: block; margin: 12px 0; font-size: 14px; font-weight: 700; }
+.owner-editor input, .owner-editor textarea { display: block; width: 100%; margin-top: 5px; padding: 9px; border: 1px solid #cbd5e1; border-radius: 8px; }
 @media (max-width: 680px) {
   .topbar { height: auto; min-height: 72px; padding: 14px 18px; align-items: flex-start; gap: 14px; flex-direction: column; }
   .actor-control { align-items: flex-start; flex-direction: column; gap: 5px; }

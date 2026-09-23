@@ -38,3 +38,36 @@ The host defaults to port 8080 and allows the Vite origin
 `.env.example` for local settings. Compose reads `.env` automatically if one
 exists; the .NET host run can receive the same variables from your shell.
 Neither a credential file nor an API key is required for B00.
+
+## Frontend walkthrough (`frontned` branch)
+
+From `web/`, run `npm ci` and `npm run dev`, then open
+`http://localhost:5173`. Set `VITE_API_BASE_URL` if the API is at a different
+origin. `npm run build` checks TypeScript and creates the production bundle.
+
+The frontend includes the F0–F6 pages: actor switcher, task wizard and owner
+detail, rating panel, catalog with topic/level filters, team proposals,
+business decisions and milestones, leaderboard, and AI logs. API requests use
+`X-Actor-Role` and `X-Actor-Id`. The API in this checkout still exposes only
+`/api/health`, so the frontend enters a **Sample workspace** when `/api/actors`
+is missing or the API cannot be reached. Its banner stays visible on every
+page. Sample tasks, scores, and decisions live only in the browser's
+`localStorage` (`taskforge.demo.v1`); they are not persisted to Firestore or
+calculated by the backend rating rules. Removing that key restores the sample
+seed. The sample scoring is for navigation rehearsal only.
+
+To rehearse the UI, choose **Tamaq Café Chain**, create a weak task, answer the
+basic questions, edit and confirm its card twice, then publish. Switch to
+**Byte Nomads** to filter the catalog and submit a proposal. Switch back to
+Tamaq to select or reject it. The seeded Nomad and Steppe cards provide a
+priority/workable catalog comparison and two seeded pending proposals. A
+confirmed sample milestone adds ten sample points to the leaderboard.
+
+The basic question template in sample mode never contacts OpenAI. The AI logs
+page records that local fallback with `fallback-stub`; its prompt and output
+are explicitly labeled as a template. No successful live AI response or
+Firestore-backed workflow has been verified in this branch. The current API
+contract has only the health route, so generated OpenAPI client integration,
+real AI validation/retry, server scoring, real seeds, and full stack acceptance
+remain pending backend work. The sample rating heuristic supports English
+rehearsal and has no language accuracy guarantee.

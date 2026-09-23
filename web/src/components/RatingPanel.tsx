@@ -40,12 +40,6 @@ export type RatingPanelProps = {
 };
 
 const LEVEL_ORDER: ReadinessLevel[] = ["draft", "workable", "ready", "priority"];
-const LEVEL_THRESHOLDS: Record<ReadinessLevel, number> = {
-  draft: 0,
-  workable: 40,
-  ready: 70,
-  priority: 90,
-};
 const LEVEL_NAMES: Record<ReadinessLevel, string> = {
   draft: "Needs clarification",
   workable: "Workable",
@@ -54,11 +48,6 @@ const LEVEL_NAMES: Record<ReadinessLevel, string> = {
 };
 
 const sourceLabel = { rules: "Deterministic rules", seed: "Seeded rating", cache: "Cached rating" } as const;
-
-function getNextLevel(rating: RatingDto) {
-  const next = LEVEL_ORDER.find((level) => LEVEL_THRESHOLDS[level] > rating.total);
-  return next ? { level: next, pointsNeeded: LEVEL_THRESHOLDS[next] - rating.total } : null;
-}
 
 function MiniBar({ score, weight }: { score: number; weight: number }) {
   const percent = weight > 0 ? Math.max(0, Math.min(100, (score / weight) * 100)) : 0;
@@ -70,7 +59,7 @@ function MiniBar({ score, weight }: { score: number; weight: number }) {
 }
 
 export function RatingPanel({ rating, variant = "full", delta, previousLevel, position, onAddDetails }: RatingPanelProps) {
-  const nextLevel = getNextLevel(rating);
+  const nextLevel = rating.nextLevel;
   const crossedLevel = previousLevel && LEVEL_ORDER.indexOf(rating.level) > LEVEL_ORDER.indexOf(previousLevel);
   const quests = [...(rating.quests ?? [])].sort((a, b) => b.potentialPoints - a.potentialPoints);
   const muted: CSSProperties = { color: "#64748b" };
@@ -108,7 +97,7 @@ export function RatingPanel({ rating, variant = "full", delta, previousLevel, po
           Confirmed score: {delta >= 0 ? `+${delta}` : `−${Math.abs(delta)}`} points{previousLevel ? ` · ${LEVEL_NAMES[previousLevel]} → ${LEVEL_NAMES[rating.level]}` : ""}
         </p>
       )}
-      {nextLevel ? <p style={{ margin: "0.5rem 0", fontWeight: 600 }}>Next level: {LEVEL_NAMES[nextLevel.level]} — {nextLevel.pointsNeeded} points needed</p> : <p style={{ margin: "0.5rem 0", fontWeight: 600 }}>Top readiness level reached</p>}
+      {nextLevel ? <p style={{ margin: "0.5rem 0", fontWeight: 600 }}>Next level: {LEVEL_NAMES[nextLevel.level as ReadinessLevel] ?? nextLevel.level} — {nextLevel.pointsNeeded} points needed</p> : rating.level === "priority" ? <p style={{ margin: "0.5rem 0", fontWeight: 600 }}>Top readiness level reached</p> : null}
 
       {variant === "full" && (
         <>

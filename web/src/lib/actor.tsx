@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 
 export type ActorRole = "business" | "team";
 
@@ -30,15 +30,12 @@ function loadActor(): Actor | null {
 }
 
 export function ActorProvider({ children }: { children: ReactNode }) {
-  const [actor, setActor] = useState<Actor | null>(() => loadActor());
-
-  useEffect(() => {
-    if (actor) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(actor));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, [actor]);
+  const [actor, updateActor] = useState<Actor | null>(() => loadActor());
+  const setActor = (next: Actor | null) => {
+    if (next) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    else localStorage.removeItem(STORAGE_KEY);
+    updateActor(next);
+  };
 
   return <ActorContext.Provider value={{ actor, setActor }}>{children}</ActorContext.Provider>;
 }

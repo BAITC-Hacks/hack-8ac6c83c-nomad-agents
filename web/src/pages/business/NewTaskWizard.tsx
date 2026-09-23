@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch, ApiError } from "../../lib/http";
 import { CardStep } from "../../components/wizard/CardStep";
 import { ClarifyStep } from "../../components/wizard/ClarifyStep";
@@ -35,7 +35,7 @@ const fieldLabels: Record<string, string> = { title: "Title", context: "Context"
 
 export function labelForField(key: string) { return fieldLabels[key] ?? key; }
 
-export default function NewTaskWizard() {
+export default function NewTaskWizard({ taskId, onCreated }: { taskId?: string; onCreated?: (id: string) => void }) {
   const [step, setStep] = useState<WizardStep>(1);
   const [task, setTask] = useState<Task | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -50,6 +50,16 @@ export default function NewTaskWizard() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [draftInput, setDraftInput] = useState<{ rawDraft: string; industry: string } | null>(null);
+
+  useEffect(() => {
+    if (!taskId || task?.id === taskId) return;
+    apiFetch<Task>(`/api/tasks/${encodeURIComponent(taskId)}`).then(saved => {
+      setTask(saved); setFields({ ...EMPTY_FIELDS, ...saved.fields }); setAnalysis(saved.analysis ?? null);
+      setRating(saved.rating ?? null);
+      setDraftInput({ rawDraft: (saved as Task & { rawDraft?: string }).rawDraft ?? "", industry: (saved as Task & { industry?: string }).industry ?? "" });
+      setStep(saved.status === "published" ? 5 : saved.rating ? 4 : saved.answersApplied ? 3 : saved.analysis ? 2 : 1);
+    }).catch(showError);
+  }, [taskId, task?.id]);
 
   const showError = (reason: unknown) => {
     if (reason instanceof ApiError) {
@@ -71,6 +81,7 @@ export default function NewTaskWizard() {
       setAnalysis(result);
       setAnswers(Object.fromEntries(result.questions.map((q) => [q.id, ""])));
       setStep(2);
+      if (!taskId) onCreated?.(created.id);
     } catch (reason) { showError(reason); }
     finally { setBusy(false); }
   };
@@ -120,6 +131,9 @@ export default function NewTaskWizard() {
     try {
       const published = await apiFetch<Task>(`/api/tasks/${task.id}/publish`, { method: "POST" });
       setTask(published); setStep(5);
+      const item = published as Task & { position?: number; catalogTotal?: number };
+      if (typeof item.position === "number") setPosition(item.position);
+      if (typeof item.catalogTotal === "number") setCatalogCount(item.catalogTotal);
     } catch (reason) { showError(reason); }
     finally { setBusy(false); }
   };
