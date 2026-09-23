@@ -2,6 +2,7 @@ using TaskForge.Api.Features.Actors;
 using TaskForge.Api.Features.Health;
 using TaskForge.Api.Features.Ai;
 using TaskForge.Api.Features.Rating;
+using TaskForge.Api.Features.Tasks;
 using TaskForge.Api.Infrastructure.OpenAi;
 using TaskForge.Api.Infrastructure.InMemory;
 
@@ -29,6 +30,7 @@ builder.Services.AddHttpClient<ResponsesClient>(client => client.Timeout = TimeS
 builder.Services.AddTransient<AnalysisService>();
 builder.Services.AddSingleton<IRatingCacheRepository, RatingCacheRepository>();
 builder.Services.AddTransient<RatingService>();
+builder.Services.AddTransient<TaskService>();
 
 var app = builder.Build();
 
@@ -44,5 +46,6 @@ app.UseMiddleware<ActorResolverMiddleware>();
 
 HealthEndpoints.MapHealthEndpoints(app);
 ActorEndpoints.MapActorEndpoints(app);
+app.MapTaskEndpoints();
 
 app.Run();

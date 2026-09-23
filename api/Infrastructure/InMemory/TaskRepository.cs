@@ -101,6 +101,7 @@ public sealed class TaskRepository(InMemoryDataStore store) : ITaskRepository
                 .TakeLast(10)
                 .Select(item => item with { ScoredAt = Utc(item.ScoredAt) })
                 .ToArray(),
+            Revision = current.Revision + 1,
             HasUnconfirmedChanges = false,
             UpdatedAt = Utc(updatedAt)
         });
