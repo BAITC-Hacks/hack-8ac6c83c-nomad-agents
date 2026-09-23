@@ -4,6 +4,7 @@ using TaskForge.Api.Features.Ai;
 using TaskForge.Api.Features.Rating;
 using TaskForge.Api.Features.Tasks;
 using TaskForge.Api.Features.Catalog;
+using TaskForge.Api.Features.Proposals;
 using TaskForge.Api.Infrastructure.OpenAi;
 using TaskForge.Api.Infrastructure.InMemory;
 
@@ -33,6 +34,7 @@ builder.Services.AddSingleton<IRatingCacheRepository, RatingCacheRepository>();
 builder.Services.AddTransient<RatingService>();
 builder.Services.AddTransient<TaskService>();
 builder.Services.AddTransient<CatalogService>();
+builder.Services.AddTransient<ProposalService>();
 
 var app = builder.Build();
 
@@ -50,5 +52,6 @@ HealthEndpoints.MapHealthEndpoints(app);
 ActorEndpoints.MapActorEndpoints(app);
 app.MapTaskEndpoints();
 app.MapCatalogEndpoints();
+app.MapProposalEndpoints();
 
 app.Run();

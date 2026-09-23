@@ -40,13 +40,22 @@ public sealed class ProposalRepository(InMemoryDataStore store) : IProposalRepos
     public bool Add(Proposal proposal)
     {
         Validate(proposal);
-        return store.Collection<Proposal>().TryAdd(proposal.Id, Normalize(proposal));
+        lock (store.SyncRoot)
+        {
+            var added = store.Collection<Proposal>().TryAdd(proposal.Id, Normalize(proposal));
+            if (added) RefreshProposalCount(proposal.TaskId);
+            return added;
+        }
     }
 
     public void Upsert(Proposal proposal)
     {
         Validate(proposal);
-        store.Collection<Proposal>()[proposal.Id] = Normalize(proposal);
+        lock (store.SyncRoot)
+        {
+            store.Collection<Proposal>()[proposal.Id] = Normalize(proposal);
+            RefreshProposalCount(proposal.TaskId);
+        }
     }
 
     public RepositoryResult<Proposal> UpsertPending(Proposal proposal)
@@ -75,6 +84,7 @@ public sealed class ProposalRepository(InMemoryDataStore store) : IProposalRepos
 
             var created = Normalize(proposal);
             proposals[proposal.Id] = created;
+            RefreshProposalCount(proposal.TaskId);
             return RepositoryResult<Proposal>.Success(created);
         }
     }
@@ -170,6 +180,15 @@ public sealed class ProposalRepository(InMemoryDataStore store) : IProposalRepos
         && updated.TaskId.Equals(current.TaskId, StringComparison.Ordinal)
         && updated.TeamId.Equals(current.TeamId, StringComparison.Ordinal)
         && updated.BusinessId.Equals(current.BusinessId, StringComparison.Ordinal);
+
+    private void RefreshProposalCount(string taskId)
+    {
+        var tasks = store.Collection<TaskCard>();
+        if (!tasks.TryGetValue(taskId, out var task)) return;
+        var count = store.Collection<Proposal>().Values.Count(proposal =>
+            proposal.TaskId.Equals(taskId, StringComparison.Ordinal));
+        tasks[taskId] = task with { ProposalCount = count };
+    }
 
     private static Proposal Normalize(Proposal proposal) => proposal with
     {
