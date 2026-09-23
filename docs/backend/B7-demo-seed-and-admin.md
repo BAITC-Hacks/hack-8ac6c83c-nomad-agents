@@ -8,18 +8,18 @@ Make a clean local emulator launch immediately usable for the demo and provide t
 
 ## Starting point and files
 
-`api/Features/Admin/Endpoints.cs` currently returns success without touching Firestore. Own `api/Features/Admin/`, `seed/demo/`, `seed/full/`, and any dedicated seed loader. Use B1 repositories and B3's scoring service.
+`api/Features/Admin/Endpoints.cs` currently returns success without changing application state. Own `api/Features/Admin/`, `seed/demo/`, `seed/full/`, and any dedicated seed loader. Use B1 in-memory repositories and B3's scoring service.
 
 ## Implement
 
 - Create an idempotent `POST /api/admin/seed?profile=demo|full`. `demo` loads three businesses, two teams, two published cards at contrasting readiness levels, two proposals on one card, and Tamaq's weak draft text for the live wizard. `full` includes demo content plus enough persisted records for at least five distinct drafts, five complete task cards, five team profiles, and five proposals immediately after seeding; live wizard activity never counts toward these minimums. Repeated seed produces the same IDs/data and no duplicate proposals.
 - Fill all card fields and confirmed snapshots consistently. Calculate seeded ratings with the same versioned B3 rules; do not hardcode totals that disagree with fields. Nomad should appear Priority above a Workable Steppe card. Team profiles must include interests, skills, and tech tags.
 - Protect admin mutations: allow local emulator/development only, or require a server-side secret checked before mutation. In public deployment, disable them by default. Return a clear failure for unsupported profile values. A mapped `/reset` route must use the same guard or be unmapped.
-- Make `/api/health` report meaningful API/Firestore reachability without leaking configuration or secrets. Avoid claiming Firestore is healthy from a hardcoded string.
+- Keep `/api/health` truthful with `storage: "in_memory"`. Do not imply durable or shared storage.
 
 ## Acceptance
 
-`dotnet build api/TaskForge.Api.csproj` passes. Seed `demo` twice against a fresh emulator; `/api/actors` and `/api/catalog` show stable counts/order, two proposals are available to the owning business, and the weak draft can be pasted into a new task. Seed `full` twice and verify persisted counts of at least five drafts, five complete cards, five teams, and five proposals without duplicate IDs; score breakdowns match B3's rules. Invalid profile and disabled/public admin mutation fail clearly.
+`dotnet build api/TaskForge.Api.csproj` passes. Seed `demo` twice in one API process; `/api/actors` and `/api/catalog` show stable counts/order, two proposals are available to the owning business, and the weak draft can be pasted into a new task. Seed `full` twice and verify in-memory counts of at least five drafts, five complete cards, five teams, and five proposals without duplicate IDs; score breakdowns match B3's rules. Restart the API and verify state is empty until seed runs again. Invalid profile and disabled/public admin mutation fail clearly.
 
 ## Boundary
 

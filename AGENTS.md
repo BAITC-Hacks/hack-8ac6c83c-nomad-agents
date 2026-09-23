@@ -3,12 +3,12 @@
 Spec: docs/MVP_SPEC.md (source of truth). Briefs: docs/tasks/*.md.
 
 ## Stack
-.NET 9 Minimal API (api/), React+Vite+TS+Tailwind+shadcn (web/), Firestore (emulator locally), OpenAI Responses API.
+.NET 9 Minimal API (api/), React+Vite+TS+Tailwind+shadcn (web/), process-local in-memory storage, OpenAI Responses API.
 
 ## Rules
 - Contract-first: change API → regenerate client (scripts/gen-client.sh). Never edit web/src/api/.
 - Feature folders in api/Features/<Feature>/ : Endpoints.cs, Dtos.cs, Service.cs.
-- Firestore access only through repositories in api/Infrastructure/Firestore.
+- Application state lives only in the singleton store in api/Infrastructure/InMemory and is lost on API restart. Feature services access it through repositories.
 - AI calls only through api/Infrastructure/OpenAi/ResponsesClient + validators in Features/Ai.
 - Never invent card content in AI prompts/stubs. Never auto-select teams.
 - Validation errors → Results.ValidationProblem. No exceptions for control flow.

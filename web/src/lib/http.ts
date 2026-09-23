@@ -1,8 +1,7 @@
-import type { Actor } from "./actor";
+import { getCurrentActor } from "./actor";
 import { demoRequest } from "./demo";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
-const STORAGE_KEY = "taskforge.actor";
 export const DEMO_EVENT = "taskforge:demo-mode";
 let demoMode = false;
 export function isDemoMode() { return demoMode; }
@@ -10,15 +9,6 @@ function enableDemo() {
   if (!demoMode) {
     demoMode = true;
     window.dispatchEvent(new Event(DEMO_EVENT));
-  }
-}
-
-function currentActor(): Actor | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Actor) : null;
-  } catch {
-    return null;
   }
 }
 
@@ -50,7 +40,7 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const actor = currentActor();
+  const actor = getCurrentActor();
   const headers = new Headers(init.headers);
   if (init.body != null && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (actor) {

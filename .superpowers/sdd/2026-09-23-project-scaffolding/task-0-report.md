@@ -1,5 +1,8 @@
 # Task 0: Project Scaffolding — Report
 
+
+> Archived snapshot: the storage design and executable snippets below describe the original scaffold. They are retained for history and must not be used. The current project uses a singleton process-local in-memory store, has no database service, and loses data on API restart. See MVP_SPEC.md and docs/backend/README.md.
+
 **Status:** DONE
 
 **Completed:** 2026-09-23 14:12 UTC

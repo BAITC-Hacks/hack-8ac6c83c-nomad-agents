@@ -7,33 +7,19 @@ export interface Actor {
   actorId: string;
 }
 
-const STORAGE_KEY = "taskforge.actor";
+let activeActor: Actor | null = null;
 
 const ActorContext = createContext<{
   actor: Actor | null;
   setActor: (actor: Actor | null) => void;
 } | null>(null);
 
-function loadActor(): Actor | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const value: unknown = JSON.parse(raw);
-    if (typeof value !== "object" || value === null) return null;
-    const candidate = value as Partial<Actor>;
-    return (candidate.role === "business" || candidate.role === "team") && typeof candidate.actorId === "string" && candidate.actorId
-      ? { role: candidate.role, actorId: candidate.actorId }
-      : null;
-  } catch {
-    return null;
-  }
-}
+export function getCurrentActor() { return activeActor; }
 
 export function ActorProvider({ children }: { children: ReactNode }) {
-  const [actor, updateActor] = useState<Actor | null>(() => loadActor());
+  const [actor, updateActor] = useState<Actor | null>(activeActor);
   const setActor = (next: Actor | null) => {
-    if (next) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    else localStorage.removeItem(STORAGE_KEY);
+    activeActor = next;
     updateActor(next);
   };
 

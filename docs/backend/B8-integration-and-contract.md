@@ -19,7 +19,7 @@ Work after B2–B7. Inspect `api/Program.cs`, feature endpoint mappings, service
 
 ## Acceptance
 
-Run `dotnet build api/TaskForge.Api.csproj`. Against the local emulator, manually seed demo, switch actors, create a weak task, analyze 3–7 questions with ≤4 chips, apply answers once, edit the card, confirm and inspect deterministic breakdown/quests, improve and reconfirm for actual delta/level-up, publish, browse and filter catalog by topic and level, submit a proposal, and Select / Reject it as the business. Retry Apply identically and with changed input; verify unchanged retry vs `409`. Seed full and verify all five-of-each persisted minimums. Try wrong actor headers and invalid input. Record observed response/contract differences for frontend handoff and the README scenarios.
+Run `dotnet build api/TaskForge.Api.csproj`. In one local API process, manually seed demo, switch actors, create a weak task, analyze 3–7 questions with ≤4 chips, apply answers once, edit the card, confirm and inspect deterministic breakdown/quests, improve and reconfirm for actual delta/level-up, publish, browse and filter catalog by topic and level, submit a proposal, and Select / Reject it as the business. Retry Apply identically and with changed input; verify unchanged retry vs `409`. Seed full and verify all five-of-each in-memory minimums. Restart and verify data is cleared. Try wrong actor headers and invalid input. Record observed response/contract differences for frontend handoff and README scenarios.
 
 ## Boundary
 

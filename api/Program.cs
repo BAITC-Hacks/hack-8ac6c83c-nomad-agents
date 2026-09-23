@@ -1,4 +1,5 @@
 using TaskForge.Api.Features.Health;
+using TaskForge.Api.Infrastructure.InMemory;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,7 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .AllowAnyMethod()));
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
+builder.Services.AddSingleton<InMemoryDataStore>();
 
 var app = builder.Build();
 

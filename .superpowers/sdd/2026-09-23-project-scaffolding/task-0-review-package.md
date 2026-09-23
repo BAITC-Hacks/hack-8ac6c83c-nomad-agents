@@ -1,5 +1,8 @@
 # Task 0 Review Package
 
+
+> Archived snapshot: the storage design and executable snippets below describe the original scaffold. They are retained for history and must not be used. The current project uses a singleton process-local in-memory store, has no database service, and loses data on API restart. See MVP_SPEC.md and docs/backend/README.md.
+
 ## Commits
 
 edc7ceb Refactor code structure for improved readability and maintainability

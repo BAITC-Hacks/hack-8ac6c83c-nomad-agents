@@ -8,7 +8,7 @@ Let any valid team propose on any published task, then let only the owning busin
 
 ## Starting point and files
 
-`api/Features/Proposals/Endpoints.cs` currently returns empty arrays or placeholder proposals. `api/Infrastructure/Firestore/ProposalRepository.cs` already derives a stable task/team ID. Own feature endpoints/DTOs/service; B1 owns repository serialization and transaction helpers.
+`api/Features/Proposals/Endpoints.cs` currently returns empty arrays or placeholder proposals. `api/Infrastructure/InMemory/ProposalRepository.cs` derives a stable task/team ID. Own feature endpoints/DTOs/service; B1 owns repository data shape and atomic update helpers.
 
 ## Implement
 

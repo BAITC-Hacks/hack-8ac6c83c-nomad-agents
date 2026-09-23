@@ -1,6 +1,6 @@
 # TaskForge — MVP Specification
 **AI Challenge Coach: Business Task Readiness & Open Team Selection**
-4-hour hackathon build · 2 developers · .NET 9 + React + Firestore + OpenAI
+4-hour hackathon build · 2 developers · .NET 9 + React + in-memory storage + OpenAI
 
 ---
 
@@ -23,8 +23,8 @@ The product gamifies the quality of the business problem statement. Each editing
 | 5 | AI scope | SoW minimum: completeness analysis + clarifying questions |
 | 6 | Rating | Backend-owned, deterministic rubric; AI feedback cannot change points |
 | 7 | Identity | Role switcher, no login |
-| 8 | Data access | Frontend → .NET API only; Firestore closed to clients |
-| 9 | Local DB | Firestore emulator in compose |
+| 8 | Data access | Frontend → .NET API only; all backend state is process-local |
+| 9 | Storage | In-memory singleton store; reset on API restart |
 | 10 | API style | Minimal APIs, single project, feature folders |
 | 11 | Frontend | Vite + TypeScript + Tailwind + shadcn/ui |
 | 12 | FE state | TanStack Query + generated typed client |
@@ -56,7 +56,7 @@ The product gamifies the quality of the business problem statement. Each editing
 | R1 | **Rating must be explainable and stable (25 pts criterion).** | The backend applies versioned, field-specific 0/half/full rules to confirmed fields; AI cannot supply points or levels. Identical confirmed input and rubric version produce the same breakdown, quests, and total. |
 | R2 | **"AI must not add facts."** Chips and extraction can smuggle invented facts. | Chips are options only and require user selection. Extraction is restricted to verbatim spans from the draft; backend verifies value/evidence correspondence and that evidence occurs in the raw draft. AI-generated titles require human review. |
 | R3 | **"Draft" naming collision.** Readiness level "Draft" (0–39) ≠ unpublished task. | Use `status: editing \| published` and `level: draft \| workable \| ready \| priority`. UI label for level draft: "Needs clarification". |
-| R4 | **Seed below SoW §6 minimum** (5 of each). | `full` contains at least 5 persisted drafts, complete cards, teams, and proposals immediately after seed; it never counts live wizard activity. |
+| R4 | **Seed below SoW §6 minimum** (5 of each). | `full` loads at least 5 drafts, complete cards, teams, and proposals into memory immediately after seed; it never counts live wizard activity. |
 | R5 | **SoW requires readiness filter** — not only topic. | Both filters implemented. |
 | R6 | **Live demo depends on OpenAI latency/availability.** | Mini model, 20s timeout, stub fallback, `AI_MODE=stub` env override for offline. |
 | R7 | **4 h not 5 h; 2 devs not 3–5.** | Hard cut list in §12; code freeze at T+3:45. |
@@ -103,16 +103,15 @@ Auth, passwords, complex roles, chat, notifications, calendar, file upload, ML t
 
 ```
 ┌──────────────┐   HTTPS/JSON   ┌───────────────────────────┐    gRPC    ┌───────────┐
-│ React SPA    │ ─────────────► │ .NET 9 Minimal API        │ ─────────► │ Firestore │
-│ (Netlify)    │  X-Actor-*     │ (Cloud Run)                │            │ (native)  │
-│ TanStack Q.  │                │  Features/ Rating/ Ai/     │ ─────────► │ OpenAI    │
-└──────────────┘                └───────────────────────────┘   HTTPS    │ Responses │
-                                                                          └───────────┘
-Local: docker compose → web (vite) + api + firestore-emulator
+│ React SPA    │ ─────────────► │ .NET 9 Minimal API        │ ─────────► │ OpenAI    │
+│ (Netlify)    │  X-Actor-*     │ (process-local state)      │   HTTPS    │ Responses │
+│ TanStack Q.  │                │  Features/ Rating/ Ai/     │            └───────────┘
+└──────────────┘                └───────────────────────────┘
+Local: docker compose → web (vite) + api
 ```
 
-- Frontend never touches Firestore. Firestore security rules: deny all client access.
-- API is stateless; all state in Firestore.
+- Frontend accesses state only through the API.
+- The API is stateful. One singleton in-memory store owns all data, and restart/redeployment clears it. Do not use a database, ORM, filesystem persistence, or external cache.
 - Demo actor identity via role-switcher headers `X-Actor-Role: business|team`, `X-Actor-Id: <id>`. Validate existence and ownership for correctness; this is not authentication. Public destructive admin operations are disabled or require a server-side secret.
 
 ### Repository layout
@@ -134,7 +133,7 @@ Local: docker compose → web (vite) + api + firestore-emulator
 │  ├─ Program.cs
 │  ├─ Domain/                 # records: TaskCard, Rating, Proposal, Team, Business, enums
 │  ├─ Infrastructure/
-│  │  ├─ Firestore/           # FirestoreDb factory, repositories
+│  │  ├─ InMemory/            # singleton store and repositories
 │  │  └─ OpenAi/              # ResponsesClient (HttpClient), schemas, prompts
 │  └─ Features/
 │     ├─ Actors/              # businesses, teams, role list
@@ -208,7 +207,7 @@ Local: docker compose → web (vite) + api + firestore-emulator
 
 The AI Challenge Coach reference calls 40–69 “Working”; this MVP uses “Workable” because that is the label in `TECHTASK.pdf`. The score boundaries are identical.
 
-### 4.4 Firestore collections
+### 4.4 In-memory collections
 
 ```
 businesses/{businessId}
@@ -266,7 +265,7 @@ aiLogs/{logId}
   errors: string[], latencyMs, createdAt
 ```
 
-No composite indexes needed if catalog sorting/filtering is done in memory (≤ 100 tasks). **Do it in memory** — avoids index-creation delays on Firestore.
+Repositories expose the collections through typed interfaces over the singleton store. Multi-record changes use the store's shared lock for atomic process-local updates. Catalog sorting/filtering is done in memory (≤ 100 tasks). Data is intentionally non-durable and is not shared between API instances.
 
 ---
 
@@ -525,7 +524,7 @@ All routes under `/api`. JSON. Errors = RFC 7807 `ProblemDetails` with `errors` 
 
 | Method | Route | Actor | Body → Response |
 |---|---|---|---|
-| GET | `/health` | — | `{ status, aiMode, firestore: "ok" }` |
+| GET | `/health` | — | `{ status, aiMode, storage: "in_memory" }` |
 | GET | `/actors` | — | `{ businesses[], teams[] }` for role switcher |
 | POST | `/tasks` | business | `{ rawDraft, industry }` → `TaskDto` (status editing) |
 | GET | `/tasks/mine` | business | `TaskSummaryDto[]` (incl. position, proposalCount) |
@@ -574,7 +573,7 @@ Confirm/scoring is revision-safe: capture the edited task revision when scoring 
 
 ### 8.1 Global
 - **Top bar:** TaskForge name + “AI Challenge Coach” product label · RoleSwitcher (grouped select: Businesses / Teams) · nav links for the current role · "AI logs" link.
-- Actor stored in React context + `localStorage`; orval custom mutator injects `X-Actor-*` headers.
+- Actor stored in React context and a module-level memory reference; browser reload clears the selection. The orval custom mutator injects `X-Actor-*` headers.
 - Toasts for errors (ProblemDetails `title` + first field error).
 - After each mutation, invalidate related TanStack queries (task, catalog, mine; leaderboard only if P2 is built).
 
@@ -661,7 +660,7 @@ Each team fixture also has a non-empty `skills` array, as required by the source
 **drafts.json** — Tamaq weak draft (+ Steppe raw draft for reference).
 
 ### 9.2 `full` profile (`/seed/full/`) — SoW §6 minimum
-Includes `demo` content plus enough persisted records to contain at least 5 drafts, 5 complete task cards, 5 team profiles, and 5 proposals immediately after seed. Counts never depend on the live demo.
+Includes `demo` content plus enough in-memory records to contain at least 5 drafts, 5 complete task cards, 5 team profiles, and 5 proposals immediately after seed. Counts never depend on the live demo.
 - businesses: `b-kazagro` (Agriculture), `b-edutech` (Education)
 - tasks: Kazagro "Crop yield reporting" (**Draft** under the ruleset); EduTech "Student attendance insights" (**Ready**); plus `t-tamaq-backup` as a complete, confirmed editing card → at least 5 card documents with every rating field. This backup remains hidden from the catalog.
 - teams: `t-greenbits`, `t-pixelforge`, `t-dataweavers` → at least 5 teams, each with name, interests, skills, and technologies
@@ -681,8 +680,6 @@ OPENAI_API_KEY=sk-REPLACE_ME
 OPENAI_MODEL=REPLACE_WITH_CURRENT_MINI_MODEL
 OPENAI_TIMEOUT_SECONDS=20
 AI_MODE=live                    # live | stub
-GCP_PROJECT_ID=taskforge-local
-FIRESTORE_EMULATOR_HOST=firestore:8080   # local only; unset in Cloud Run
 CORS_ORIGINS=http://localhost:5173
 ASPNETCORE_URLS=http://+:8080
 # --- WEB ---
@@ -692,21 +689,13 @@ VITE_API_BASE_URL=http://localhost:8080
 ### 10.2 `docker-compose.yml`
 ```yaml
 services:
-  firestore:
-    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
-    command: gcloud emulators firestore start --host-port=0.0.0.0:8080 --project=taskforge-local
-    ports: ["8081:8080"]
-
   api:
     build:
       context: .
       dockerfile: api/Dockerfile
     env_file: .env
     environment:
-      FIRESTORE_EMULATOR_HOST: firestore:8080
-      GCP_PROJECT_ID: taskforge-local
     ports: ["8080:8080"]
-    depends_on: [firestore]
     volumes: ["./seed:/app/seed:ro"]
 
   web:
@@ -720,7 +709,7 @@ services:
     depends_on: [api]
 ```
 
-Firestore client: `new FirestoreDbBuilder { ProjectId = cfg.GCP_PROJECT_ID, EmulatorDetection = EmulatorDetection.EmulatorOrProduction }.Build()`.
+Register `InMemoryDataStore` as a singleton. Repositories use its typed concurrent collections and shared lock. No storage configuration or credentials are required.
 
 ### 10.3 `api/Dockerfile`
 ```dockerfile
@@ -765,11 +754,11 @@ gcloud run deploy "$SERVICE" \
   --source ./api \
   --region "$REGION" \
   --allow-unauthenticated \
-  --set-env-vars "GCP_PROJECT_ID=$PROJECT_ID,OPENAI_MODEL=$OPENAI_MODEL,AI_MODE=live,CORS_ORIGINS=$CORS_ORIGINS,ADMIN_MUTATIONS_ENABLED=$ADMIN_MUTATIONS_ENABLED,OPENAI_API_KEY=$OPENAI_API_KEY"
+  --set-env-vars "OPENAI_MODEL=$OPENAI_MODEL,AI_MODE=live,CORS_ORIGINS=$CORS_ORIGINS,ADMIN_MUTATIONS_ENABLED=$ADMIN_MUTATIONS_ENABLED,OPENAI_API_KEY=$OPENAI_API_KEY"
 
 gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)'
 ```
-One-time GCP prep: enable Run, Cloud Build, Artifact Registry, Firestore APIs; create Firestore database (Native mode); the default Cloud Run service account needs `roles/datastore.user`.
+One-time GCP prep: enable Run, Cloud Build, and Artifact Registry APIs. Because state is process-local, a Cloud Run restart, replacement, or second instance has separate empty data. Optional hosted demos must use one instance and reseed after restart; local Compose remains the reliable demo path.
 
 ### 10.5 Netlify
 `web/netlify.toml`
@@ -811,12 +800,12 @@ orval config: input `./openapi.json`, output `src/api/`, client `react-query`, c
 Spec: MVP_SPEC.md (source of truth). Briefs: docs/tasks/*.md.
 
 ## Stack
-.NET 9 Minimal API (api/), React+Vite+TS+Tailwind+shadcn (web/), Firestore (emulator locally), OpenAI Responses API.
+.NET 9 Minimal API (api/), React+Vite+TS+Tailwind+shadcn (web/), process-local in-memory storage, OpenAI Responses API.
 
 ## Rules
 - Contract-first: change API → regenerate client (scripts/gen-client.sh). Never edit web/src/api/.
 - Feature folders in api/Features/<Feature>/ : Endpoints.cs, Dtos.cs, Service.cs.
-- Firestore access only through repositories in api/Infrastructure/Firestore.
+- Application state lives only in the singleton store in api/Infrastructure/InMemory and is lost on API restart. Feature services access it through repositories.
 - AI calls only through api/Infrastructure/OpenAi/ResponsesClient + validators in Features/Ai.
 - Never invent card content in AI prompts/stubs. Never auto-select teams.
 - Validation errors → Results.ValidationProblem. No exceptions for control flow.
@@ -842,7 +831,7 @@ Before finishing: build (`dotnet build` / `npm run build`) and report changed fi
 | `A3-score.md` | A | Backend readiness rules §5.3, quests, cache, history, levels, preview |
 | `A4-wizard-ui.md` | A | Wizard steps 1–5, chips, suggestions, provenance |
 | `A5-rating-panel.md` | A | RatingPanel, delta, next level, AI logs page |
-| `B1-firestore-repos.md` | B | Repos, models, seed/reset loader, actors endpoint |
+| `B1-in-memory-storage.md` | B | In-memory repos, models, seed/reset loader, actors endpoint |
 | `B2-tasks-crud.md` | B | create/answers/fields/confirm/publish wiring, mine list |
 | `B3-catalog.md` | B | Catalog sort/position/filters, recommendations, catalog UI |
 | `B4-proposals.md` | B | Proposal upsert, list, decision, milestones, leaderboard, UIs |
@@ -855,12 +844,12 @@ Each brief: goal · files to touch · DTOs/endpoints · acceptance checks (manua
 ## 12. Work split — 2 developers, 240 min
 
 **Dev A — Coach and rating track:** stub analyze first, deterministic rating/quests, wizard UI, RatingPanel, then live OpenAI and AI logs.
-**Dev B — Core track:** scaffold, Firestore, seed, CRUD, catalog, recommendations, proposals, decisions, milestones, leaderboard, deploy.
+**Dev B — Core track:** scaffold, in-memory repositories, seed, CRUD, catalog, recommendations, proposals, decisions, milestones, leaderboard, deploy.
 
 | Time | Dev A | Dev B | Sync point |
 |---|---|---|---|
 | 0:00–0:20 | Agree spec; implement `AI_MODE=stub` analyze contract and sample response | Scaffold repo, API contract, AGENTS.md and briefs; prepare fixtures for `full` | **0:20** stub callable, contract frozen |
-| 0:20–1:15 | A3 versioned rating rules and quests; A4 wizard skeleton using stub | B1 Firestore repos, seed/reset (`full` and `demo`), `/actors`, role switcher and shell | 1:15 merge; stub → card → deterministic score callable |
+| 0:20–1:15 | A3 versioned rating rules and quests; A4 wizard skeleton using stub | B1 in-memory repos, seed/reset (`full` and `demo`), `/actors`, role switcher and shell | 1:15 merge; stub → card → deterministic score callable |
 | 1:15–2:15 | Finish Wizard steps 1–5 and RatingPanel; wire stub questions to one-time Apply and confirm | B2 tasks CRUD (one-time answers, fields, confirm → rating service, publish), My Tasks; B3 catalog API/UI, filters and position | **2:15** P0 draft → publish visible in catalog |
 | 2:15–3:00 | A1/A2 live OpenAI Responses integration, validator and retry/fallback; keep stub selectable | B4 proposals (team form, business compare table, Select/Reject); then P1 recommendations | **3:00** P0 flow locally with stub and live call checked |
 | 3:00–3:20 | Rehearse P0 in stub mode; P1 preview, history and AI logs if stable | Rehearse P0; P1 recommendations/edit, then P2 milestones/leaderboard if stable | **3:20** local rehearsal complete |

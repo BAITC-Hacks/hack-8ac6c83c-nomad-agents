@@ -12,10 +12,10 @@ Turn the existing .NET 9 Minimal API scaffold into a repeatably runnable local s
 
 ## Implement
 
-- Confirm the project restores and builds with the .NET 9 SDK. Keep a single Minimal API entry point and feature endpoint mapping; resolve startup/DI failures so the host can run before real Firestore data or an OpenAI key is available. Do not report a dependency as healthy without checking it.
+- Confirm the project restores and builds with the .NET 9 SDK. Keep a single Minimal API entry point and feature endpoint mapping; resolve startup/DI failures so the host can run without external storage or an OpenAI key.
 - Serve the built-in OpenAPI document at `/openapi/v1.json` and a Swagger UI at `/swagger` in local Development. Point the UI at that document and record its URL for the later `scripts/gen-client.sh` integration. Keep these development endpoints disabled or explicitly guarded in production.
-- Provide a simple public `GET /api/health` startup check with a truthful response. B7 later adds an actual Firestore reachability check; a hardcoded `firestore: "ok"` is not acceptable. Keep `/api` route prefixes and JSON/ProblemDetails conventions ready for B0.
-- Configure local HTTP port `8080`, CORS for the Vite origin, and environment-based settings through `.env.example`. Make `dotnet run --project api/TaskForge.Api.csproj` and the API container in `docker compose up --build` viable local paths. Ensure the local container runs in Development so Swagger UI is reachable there. Document any local emulator requirement and ensure no credential file or key is committed.
+- Provide a simple public `GET /api/health` startup check with `storage: "in_memory"`. Keep `/api` route prefixes and JSON/ProblemDetails conventions ready for B0.
+- Configure local HTTP port `8080`, CORS for the Vite origin, and environment-based settings through `.env.example`. Make `dotnet run --project api/TaskForge.Api.csproj` and the API container in `docker compose up --build` viable local paths. Ensure the local container runs in Development so Swagger UI is reachable there. No database service or storage credential is allowed.
 - Keep the OpenAPI document limited to mapped routes with honest responses. Placeholder feature routes must be identified for B0–B8 to replace or unmap; they must not be presented as working business functionality.
 
 ## Acceptance
@@ -24,4 +24,4 @@ Turn the existing .NET 9 Minimal API scaffold into a repeatably runnable local s
 
 ## Boundary
 
-Do not implement actor authorization, Firestore serialization, task lifecycle, rating rules, AI analysis, catalog, proposals, seed contents, or frontend pages. No automated tests under `AGENTS.md`'s hackathon rule. B00 establishes a runnable host and contract viewer; B8 verifies the final feature contract.
+Do not implement actor authorization, repository/domain mapping, task lifecycle, rating rules, AI analysis, catalog, proposals, seed contents, or frontend pages. No automated tests under `AGENTS.md`'s hackathon rule. B00 establishes a runnable host and contract viewer; B8 verifies the final feature contract.

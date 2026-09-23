@@ -28,7 +28,7 @@ The main P0 journey is covered by B00–B8 and F0–F4. Before this review, some
 3. **Unassigned work.** B5 excluded recommendations, B6 excluded milestones/leaderboard, and B8 excluded all P1/P2 work, while F3/F5/F6 expected the corresponding APIs. B10 now assigns this work, including the AI-log read endpoint, preview, and Reset.
 4. **Final integration.** B8 checked only the API and excluded frontend work. I0 owns client generation, combined UI/API verification, README, full seed checks, and two rehearsals; Netlify is optional.
 5. **Identifiers and paths.** MVP §§11–12 describes the older A1–A5/B1–B5 breakdown; current B identifiers refer to backend work and F identifiers to frontend work. The mapping is below. AGENTS.md references a nonexistent `docs/MVP_SPEC.md`; the actual source is at the repository root. The historical scaffold plan is not the current queue.
-6. **MVP ambiguities for B0.** GET preview reads persisted editable fields, so the UI must first call PUT /fields; that GET does not accept purely local unsaved fields. A milestone body containing only `{title}` cannot distinguish a retry from a new milestone: agree on a stable ID/idempotency key, update the contract, and generate the client before implementation. Recommendations in §6.4 use interests/techTags; skills are stored in profiles but have no separate formula weight. Do not invent one from the general description in §2.
+6. **MVP ambiguities for B0.** GET preview reads server-side editable fields from the current process, so the UI must first call PUT /fields; that GET does not accept purely local unsaved fields. A milestone body containing only `{title}` cannot distinguish a retry from a new milestone: agree on a stable ID/idempotency key, update the contract, and generate the client before implementation. Recommendations in §6.4 use interests/techTags; skills are stored in profiles but have no separate formula weight. Do not invent one from the general description in §2.
 
 ## Mapping the old plan to current tasks
 
@@ -39,10 +39,10 @@ The main P0 journey is covered by B00–B8 and F0–F4. Before this review, some
 | A3 score | B3, B4 (confirm/history), B10 (preview) |
 | A4 wizard | F1 |
 | A5 rating/logs | F2, F6, B10 (logs endpoint) |
-| B1 repos/seed | B1, B7 |
+| B1 in-memory repos/seed | B1, B7 |
 | B2 CRUD | B4 |
 | B3 catalog | B5, F3, B10 (recommendations) |
 | B4 proposals | B6, F4, B10 (milestones), F5 |
 | B5 deploy | B9, I0 (Netlify) |
 
-For two developers, preserve the split from MVP §12: Dev A owns B2/B3/F1/F2, then F6; Dev B owns B00/B0/B1/B4/B5/B6/B7/F0/F3/F4; B8/I0 is joint integration work. These are ownership boundaries, not a requirement to complete every task sequentially. Start the B0 contract before working B1 repositories; verify the actor guard after B1/B7. The B2 stub and pure B3 rules can be prepared against agreed DTOs, with persistence connected later. Prepare B7 early for frontend work. Generate the client when the contract changes rather than waiting for final B8 integration. P1/P2 must not delay P0.
+For two developers, preserve the split from MVP §12: Dev A owns B2/B3/F1/F2, then F6; Dev B owns B00/B0/B1/B4/B5/B6/B7/F0/F3/F4; B8/I0 is joint integration work. These are ownership boundaries, not a requirement to complete every task sequentially. Start the B0 contract before working B1 repositories; verify the actor guard after B1/B7. The B2 stub and pure B3 rules can be prepared against agreed DTOs, with the singleton store connected later. Prepare B7 early for frontend work. Generate the client when the contract changes rather than waiting for final B8 integration. P1/P2 must not delay P0.

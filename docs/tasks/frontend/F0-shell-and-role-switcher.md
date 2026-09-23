@@ -8,7 +8,7 @@ Spec: MVP_SPEC.md §8.1, §3 (actor headers), §7 (`/actors`).
 Global app chrome and the demo identity mechanism every other frontend task depends on.
 
 ## Files to touch
-- `web/src/lib/actor.tsx` — React context storing `{ role: 'business'|'team', actorId }`, persisted to `localStorage`.
+- `web/src/lib/actor.tsx` — React context and module-level memory reference storing `{ role: 'business'|'team', actorId }`; reload clears the selection.
 - `web/src/lib/http.ts` — orval custom mutator: base URL from `VITE_API_BASE_URL`, injects `X-Actor-Role` / `X-Actor-Id` headers from actor context.
 - `web/src/components/RoleSwitcher.tsx` — grouped select (Businesses / Teams), populated from `GET /actors`.
 - `web/src/components/AppShell.tsx` / top bar — "TaskForge" name + "AI Challenge Coach" label, RoleSwitcher, nav links that change by current role. Add the AI logs link with the P1 viewer; add Leaderboard navigation with P2.

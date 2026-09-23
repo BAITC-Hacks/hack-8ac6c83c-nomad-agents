@@ -53,7 +53,7 @@ export default function App() {
     else page = <section className="page-card"><h1>Page not found</h1><a href={actor.role === "business" ? "/business/tasks" : "/catalog"}>Return to workspace</a></section>;
   }
   return <><AppShell actor={actor} path={path} navigate={navigate} roleSwitcher={<RoleSwitcher actors={actors} error={error} />}>
-    {demo && <div className="demo-banner" role="status"><strong>Sample workspace</strong> · API unavailable. Data and sample scores are stored only in this browser; they are not official ratings.</div>}
+    {demo && <div className="demo-banner" role="status"><strong>Sample workspace</strong> · API unavailable. Data and sample scores live only in this tab and reset on reload; they are not official ratings.</div>}
     {page}
   </AppShell><Toaster /></>;
 }

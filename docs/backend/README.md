@@ -8,7 +8,7 @@ Source of truth: [MVP_SPEC.md](../../MVP_SPEC.md), especially §§2–3, 4–7 a
 |---|---|---|---|
 | P0 first | [B00](B00-runnable-api-and-swagger.md) | Runnable .NET API, truthful health, OpenAPI JSON, Swagger UI | — |
 | P0 | [B0](B0-contract-and-actor-guard.md) | API contract, actor guard for role switcher | B00 |
-| P0 | [B1](B1-firestore-persistence.md) | Firestore models and repositories | B0 |
+| P0 | [B1](B1-in-memory-storage.md) | In-memory models and repositories | B0 |
 | P0 | [B2](B2-ai-analysis.md) | Analyze, questions, chips, suggestions, safe fallback | B0, B1 |
 | P0 | [B3](B3-readiness-engine.md) | Deterministic score, breakdown, quests, levels | B1 |
 | P0 | [B4](B4-task-lifecycle.md) | Draft, one-time answers, editable card, two confirms, publish | B1, B2, B3 |
@@ -24,4 +24,4 @@ P0 API surface: `/api/health`, `/api/actors`, task create/read/mine/analyze/answ
 
 P0 includes `full` seed data and README handoff even if the live demo uses `demo`. P1 begins only after P0 is stable: recommendation ranking, post-publish edits/preview/history, AI-log viewer, and decision Reset. P2 adds milestones, team points, leaderboard, and optional hosting. AI call logs are persisted in P0 so prompt, schema, invalid-output handling, and fallback can be documented even if the P1 viewer is deferred. B9 is P2.
 
-Each coding agent should read the linked brief and `AGENTS.md`, report changed files, run `dotnet build api/TaskForge.Api.csproj`, and perform its brief's manual checks with the Firestore emulator when the dependency is available. Do not add automated tests under the repository's hackathon rule. If a shared contract must change, coordinate the DTO/route update with dependent briefs before implementation.
+Each coding agent should read the linked brief and `AGENTS.md`, report changed files, run `dotnet build api/TaskForge.Api.csproj`, and perform its brief's manual checks in one API process. Restart checks must confirm that state is cleared. Do not add automated tests under the repository's hackathon rule. If a shared contract must change, coordinate the DTO/route update with dependent briefs before implementation.

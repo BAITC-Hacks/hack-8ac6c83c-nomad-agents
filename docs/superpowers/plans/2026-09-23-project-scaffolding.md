@@ -1,5 +1,8 @@
 # TaskForge MVP Project Scaffolding
 
+
+> Archived snapshot: the storage design and executable snippets below describe the original scaffold. They are retained for history and must not be used. The current project uses a singleton process-local in-memory store, has no database service, and loses data on API restart. See MVP_SPEC.md and docs/backend/README.md.
+
 > Historical scaffold plan, not the current feature queue. Its A/B brief names and completion checklist do not establish implementation status. Use the [reviewed task map](../../README.md), [backend queue](../../backend/README.md), and [frontend queue](../../tasks/frontend/README.md) for current work; MVP_SPEC.md in the repository root remains the build specification.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

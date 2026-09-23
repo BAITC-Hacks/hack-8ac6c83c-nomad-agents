@@ -12,7 +12,7 @@
 ## Manual acceptance and deliverables
 
 - Build API and web; run `docker compose up --build` and click the full P0 path, rather than accepting API-only checks. Use S1–S9, S11, S14, S16–S18 from MVP §14; check S18's language limitation is visible. Run optional scenarios only for delivered optional slices.
-- Seed `full` and verify at least five persisted drafts/cards/teams/proposals before interaction; then restore `demo` locally for rehearsal. Check low-score visibility/proposals and manual selection of multiple or zero teams.
+- Seed `full` and verify at least five in-memory drafts/cards/teams/proposals before interaction; then restore `demo` locally for rehearsal. Restart the API once to verify state clears, reseed, and check low-score visibility/proposals and manual selection of multiple or zero teams.
 - Rehearse the ≤5-minute script twice, with a prepared English card whose actual confirmed score rises across a threshold, and preserve a reliable stub-mode fallback. Record actual results and remaining limitations in README; do not claim unexecuted checks passed.
 - Confirm repository/archive delivery instructions, runnable local environment, README and prepared demonstration are present. No automated tests, keys or `.env` commits.
 

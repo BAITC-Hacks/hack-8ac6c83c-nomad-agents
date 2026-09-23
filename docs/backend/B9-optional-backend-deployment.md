@@ -12,14 +12,14 @@ The spec sketches `api/Dockerfile`, `docker-compose.yml`, `.env.example`, and `s
 
 ## Implement
 
-- Make the Docker build context coherent with the root `seed/` directory and the API project. Keep local Compose wired to the Firestore emulator and production configuration wired to native Firestore via B1's builder.
-- Configure CORS for the actual SPA origin, a non-placeholder OpenAI model/key, and a service account that can access Firestore. Keep credentials out of git and command output; use an appropriate server-side secret mechanism. Public admin mutations must remain disabled or secret-guarded.
-- Provide a backend deployment script/instructions with prerequisites, build, environment variables, and a read-only health check. Avoid destructive database reset/seed in production deployment steps.
+- Make the Docker build context coherent with the root `seed/` directory and the API project. Local and hosted builds use the same process-local in-memory store.
+- Configure CORS for the actual SPA origin and a non-placeholder OpenAI model/key. Keep credentials out of git and command output; use an appropriate server-side secret mechanism. Public admin mutations must remain disabled or secret-guarded.
+- Provide deployment instructions that explicitly state that restart, replacement, and scale-out lose or split data. Limit an optional Cloud Run demo to one instance and include a safe reseed procedure. Local Compose remains the reliable demonstration environment.
 - If deployment is authorized, use the prepared script and then manually check health, actor loading, and a harmless catalog read. Otherwise leave a reviewable script and local verification result.
 
 ## Acceptance
 
-`dotnet build api/TaskForge.Api.csproj` and local Docker build succeed. Deployment instructions identify the expected image/source context and environment settings. A public request to seed/reset is denied. If deployed, the Cloud Run health/catalog checks succeed without exposing secrets.
+`dotnet build api/TaskForge.Api.csproj` and local Docker build succeed. Deployment instructions identify the expected image/source context, environment settings, one-instance constraint, and non-durable state. A public request to seed/reset is denied. If deployed, the Cloud Run health/catalog checks succeed without exposing secrets.
 
 ## Boundary
 

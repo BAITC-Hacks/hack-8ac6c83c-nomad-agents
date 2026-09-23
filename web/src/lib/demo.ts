@@ -7,7 +7,6 @@ type Fields = Record<string, string | string[]>;
 type Task = { id: string; businessId: string; businessName: string; rawDraft: string; industry: string; status: string; fields: Fields; confirmed?: { fields: Fields; confirmedAt: string }; rating?: ReturnType<typeof sampleRating>; answersApplied?: boolean; answerHash?: string; analysis?: ReturnType<typeof analyze>; hasUnconfirmedChanges?: boolean };
 type Proposal = { id: string; taskId: string; taskTitle: string; teamId: string; teamName: string; tags: string[]; idea: string; plan: string; timeline: string; prototypeUrl: string; status: "pending" | "selected" | "rejected"; reason?: string; milestones: { id: string; title: string }[] };
 type DemoState = { tasks: Task[]; proposals: Proposal[]; logs: unknown[] };
-const KEY = "taskforge.demo.v1";
 const businesses = [
   { id: "b-nomad", name: "Nomad Logistics", industry: "Logistics", contactName: "Aigerim" },
   { id: "b-steppe", name: "Steppe Retail", industry: "Retail", contactName: "Dana" },
@@ -70,11 +69,9 @@ function seed(): DemoState {
     { id: "proposal-null", taskId: nomad.id, taskTitle: String(sampleFields.title), teamId: "t-nullptr", teamName: "Null Pointers", tags: teams[1].tags, idea: "Rules-based alerts with explanations.", plan: "Map late-delivery patterns, implement alerts, then test the workflow.", timeline: "6 weeks", prototypeUrl: "", status: "pending", milestones: [] },
   ], logs: [] };
 }
-function read(): DemoState {
-  try { const saved = localStorage.getItem(KEY); if (saved) return JSON.parse(saved) as DemoState; } catch { /* use seed */ }
-  const state = seed(); write(state); return state;
-}
-function write(state: DemoState) { localStorage.setItem(KEY, JSON.stringify(state)); window.dispatchEvent(new Event("taskforge:demo-changed")); }
+let memoryState: DemoState | undefined;
+function read(): DemoState { return memoryState ??= seed(); }
+function write(state: DemoState) { memoryState = state; window.dispatchEvent(new Event("taskforge:demo-changed")); }
 function fail(title: string): never { throw new Error(title); }
 function body(raw: BodyInit | null | undefined): Record<string, any> { try { return JSON.parse(String(raw ?? "{}")); } catch { return {}; } }
 function positions(state: DemoState) {
@@ -90,7 +87,7 @@ export function demoRequest<T>(url: string, method: string, raw: BodyInit | null
   const state = read(); const path = new URL(url, location.origin).pathname.replace(/^\/api/, ""); const input = body(raw);
   let result: unknown;
   if (path === "/actors" && method === "GET") result = { businesses, teams };
-  else if (path === "/health") result = { status: "sample", aiMode: "stub", firestore: "unavailable" };
+  else if (path === "/health") result = { status: "sample", aiMode: "stub", storage: "browser_memory" };
   else if (path === "/tasks" && method === "POST") {
     if (actor?.role !== "business") fail("Choose a business profile first.");
     const business = businesses.find(b => b.id === actor.actorId)!;
