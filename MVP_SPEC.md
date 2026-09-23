@@ -59,9 +59,9 @@ The product gamifies the quality of the business problem statement. Each editing
 | R4 | **Seed below SoW §6 minimum** (5 of each). | `full` contains at least 5 persisted drafts, complete cards, teams, and proposals immediately after seed; it never counts live wizard activity. |
 | R5 | **SoW requires readiness filter** — not only topic. | Both filters implemented. |
 | R6 | **Live demo depends on OpenAI latency/availability.** | Mini model, 20s timeout, stub fallback, `AI_MODE=stub` env override for offline. |
-| R7 | **4 h not 5 h; 2 devs not 3–5.** | Hard cut list in §13; code freeze at T+3:45. |
+| R7 | **4 h not 5 h; 2 devs not 3–5.** | Hard cut list in §12; code freeze at T+3:45. |
 | R8 | **Secrets.** Real `OPENAI_API_KEY` in git = key revoked + judges notice. | `.env` in `.gitignore` from minute 1; Cloud Run gets vars via `--set-env-vars`. |
-| R9 | **CORS / mixed hosting.** Netlify → Cloud Run calls fail at demo time. | CORS allow-list from env; deploy both by T+3:20, not at the end. |
+| R9 | **CORS / mixed hosting.** Netlify → Cloud Run calls may fail during a hosted demo. | CORS allow-list from env; rehearse the local Compose flow first and deploy only if time remains. |
 | R10 | **No automated tests.** | Manual scenario checklist §14 run twice before freeze. |
 
 ---
@@ -80,6 +80,8 @@ The product gamifies the quality of the business problem statement. Each editing
 - Milestone confirmation → team points → leaderboard
 - Seed/reset endpoints (`demo`, `full`)
 - AI call log viewer (prompt, input, output, validation result) — satisfies SoW §5 "show prompt, input/output format, invalid handling"
+
+Task readiness and catalog position are the primary gamification. Milestone points recognize confirmed team progress required by `TECHTASK.pdf`; they do not feed task ratings, student XP, or automatic assignment.
 
 ### Out of scope
 Auth, passwords, complex roles, chat, notifications, calendar, file upload, ML training, vector DB, mobile layout, project tracker, automated tests, CI/CD.
@@ -109,11 +111,11 @@ Local: docker compose → web (vite) + api + firestore-emulator
 ├─ AGENTS.md                  # shared agent rules (Codex + Claude)
 ├─ CLAUDE.md                  # "Read AGENTS.md" + Claude-specific notes
 ├─ README.md                  # SoW deliverable: architecture, formula, catalog rules, test scenarios
+├─ MVP_SPEC.md                # source of truth for this build
 ├─ .env.example
 ├─ .gitignore                 # includes .env
 ├─ docker-compose.yml
 ├─ docs/
-│  ├─ MVP_SPEC.md             # this file
 │  └─ tasks/                  # per-module agent briefs (§11)
 ├─ api/
 │  ├─ Dockerfile
@@ -213,6 +215,7 @@ tasks/{taskId}
             successCriteria, contact, interactionFormat, topics[], techTags[] }
   fieldProvenance: { <fieldKey>: "user" | "draft-extract" | "chip" }   # UI only
   analysis: {                              # last AI analyze result (validated)
+    missingFields: string[],
     questions: [{ id, fieldKey, question, chips: string[] }],
     suggestions: [{ fieldKey, action }],
     extracted: [{ fieldKey, value, evidence }],
@@ -308,17 +311,18 @@ RULES
 1. Never invent facts. Only the user's draft and current fields are facts.
 2. "extracted": copy values ONLY if they are explicitly stated in the draft. For each, "evidence"
    must be an exact substring of the draft. If unsure, do not extract.
-3. "questions": 3 to 7 questions, one per missing or weak field, most important first
+3. "missingFields": list only the provided field keys whose details are absent or too weak.
+4. "questions": 3 to 7 questions, one per missing or weak field, most important first
    (priority: need, context, data, expectedResult, successCriteria, users, constraints,
    interactionFormat, contact). Each question is short, concrete, answerable in 1-3 sentences.
-4. "chips": 0 to 4 short answer OPTIONS per question that the user may pick. They are generic
+5. "chips": 0 to 4 short answer OPTIONS per question that the user may pick. They are generic
    typical options for this kind of business, phrased as choices (e.g. "CSV export from POS system"),
    never as claims about this company. Use [] when options would require guessing specifics
    (e.g. contact).
-5. "suggestions": 2 to 6 actionable improvement items, each starting with a verb
+6. "suggestions": 2 to 6 actionable improvement items, each starting with a verb
    ("Add...", "Specify...", "Describe..."), telling WHAT to add, never containing invented content.
-6. "fieldKey" must be one of the provided field keys.
-7. Language: same language as the draft.
+7. "fieldKey" must be one of the provided field keys.
+8. Language: same language as the draft.
 Return JSON matching the schema only.
 ```
 
@@ -327,9 +331,10 @@ Return JSON matching the schema only.
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["title", "extracted", "questions", "suggestions"],
+  "required": ["title", "missingFields", "extracted", "questions", "suggestions"],
   "properties": {
     "title": { "type": "string", "description": "Short neutral title from the draft wording; empty if unclear" },
+    "missingFields": { "type": "array", "items": { "type": "string", "enum": ["context","need","users","data","constraints","expectedResult","successCriteria","contact","interactionFormat"] } },
     "extracted": {
       "type": "array",
       "items": {
@@ -371,6 +376,7 @@ Return JSON matching the schema only.
 
 **Backend validation (`AnalyzeValidator`)**
 - `questions.Count` in [3, 7] → else invalid
+- `missingFields`: trim, deduplicate, reject unknown field keys; show as gaps to review, not as business facts
 - each `chips.Count` ≤ 4 → truncate to 4 (soft fix), trim, dedupe, drop empty/ > 80 chars
 - `extracted[i].evidence` must be a case-insensitive substring of `rawDraft`, and `value` must be copied from the evidenced source text (normalization only; no paraphrases or added details) → else drop item (log)
 - `title` is an untrusted suggestion: require business review/edit before confirm and publish
@@ -381,7 +387,7 @@ Return JSON matching the schema only.
 
 ### 5.3 Backend readiness engine (no LLM score)
 
-The `RatingService` calculates the seven criterion scores from **confirmed fields**. Each criterion receives `0`, `floor(weight / 2)`, or its full weight. The total is their sum; level thresholds remain in §4.3. A nonempty field alone earns at most half credit. Full credit requires the field-specific evidence shown below. The implementation must keep these checks in a versioned, inspectable ruleset and return the rule that fired in each breakdown reason. Text length or an isolated digit never qualifies for full credit.
+The `RatingService` calculates the seven criterion scores from card fields. For an awarded rating, it uses the **confirmed snapshot**; for an explicitly labeled preview, it uses the current editable fields without awarding points. Each criterion receives `0`, `floor(weight / 2)`, or its full weight. The total is their sum; level thresholds remain in §4.3. A nonempty field alone earns at most half credit. Full credit requires the field-specific evidence shown below. The implementation must keep these checks in a versioned, inspectable ruleset and return the rule that fired in each breakdown reason. Text length or an isolated digit never qualifies for full credit.
 
 | Criterion | Half-credit condition | Full-credit evidence check | Quest when not full |
 |---|---|---|---|
@@ -412,7 +418,7 @@ parse + validate ──invalid──► retry once (same input, append "Previous
 ```
 
 **Stubs (deterministic)**
-- `AnalyzeStub`: ask about missing or weak fields in priority order, up to 5 and never fewer than 3. If fewer than 3 gaps exist, ask relevant specificity/confirmation questions about the weakest populated fields. Chips `[]`; suggestions = "Add {label}" for each gap; extracted `[]`.
+- `AnalyzeStub`: list missing/weak keys in `missingFields` and ask about them in priority order, up to 5 and never fewer than 3 questions. If fewer than 3 gaps exist, ask relevant specificity/confirmation questions about the weakest populated fields. Chips `[]`; suggestions = "Add {label}" for each gap; extracted `[]`.
 - The readiness engine in §5.3 runs unchanged when AI is unavailable. The user can continue editing and confirming the card; only AI questions, chips, and wording suggestions switch to basic mode.
 
 | fieldKey | Stub question |
@@ -526,6 +532,7 @@ RatingDto { total:number; level:'draft'|'workable'|'ready'|'priority';
   nextLevel?:{ level:string; pointsNeeded:number } }
 
 AnalysisDto { title:string;
+  missingFields:string[];
   questions:{id:string; fieldKey:string; question:string; chips:string[]}[];
   suggestions:{fieldKey:string; action:string}[];
   extracted:{fieldKey:string; value:string; evidence:string}[];
@@ -539,7 +546,7 @@ Confirm/scoring is revision-safe: capture the edited task revision when scoring 
 ## 8. Frontend specification
 
 ### 8.1 Global
-- **Top bar:** app name · RoleSwitcher (grouped select: Businesses / Teams) · nav links for the current role · "AI logs" link.
+- **Top bar:** TaskForge name + “AI Challenge Coach” product label · RoleSwitcher (grouped select: Businesses / Teams) · nav links for the current role · "AI logs" link.
 - Actor stored in React context + `localStorage`; orval custom mutator injects `X-Actor-*` headers.
 - Toasts for errors (ProblemDetails `title` + first field error).
 - After each mutation, invalidate related TanStack queries (task, catalog, mine, leaderboard).
@@ -552,13 +559,13 @@ Table: title · status · score + LevelBadge · catalog position `#n/m` · propo
 **B2. New Task Wizard** (`/business/tasks/new` → `/business/tasks/:id/wizard`)
 - Stepper: `1 Draft → 2 Clarify → 3 Card → 4 Rating → 5 Publish`.
 - **Step 1 Draft:** textarea (20–4000), industry select, **Analyze** → creates task + calls analyze. Loading state "Analyzing your description…".
-- **Step 2 Clarify:** list of 3–7 question cards. Each: question text, field label tag, up to 4 **chips** (toggle-select, multi allowed; selecting inserts chip text into the textarea), free-text textarea (editable after chip insert). Side panel **Suggested actions** (checklist, informational). If `source=stub` → amber badge "AI unavailable — basic questions". **Apply answers** → PUT answers → step 3.
-- **Step 3 Card:** form with all fields from §4.1, tag inputs for topics/techTags. Fields with draft-extracted values show a "From your draft: '…evidence…' [Use]" hint. Empty fields highlighted with the related suggestion text as placeholder. Provenance dot per field (user / chip / draft). **Confirm & score**.
-- **Step 4 Rating:** RatingPanel (below). Buttons: **Improve** (back to step 3) · **Publish**.
+- **Step 2 Clarify:** “AI Challenge Coach” panel with 3–7 relevant question cards. Each has question text, field label, up to 4 chips (selecting inserts editable text), and a free-text answer. Show suggested actions separately. If `source=stub`, show “AI unavailable — basic questions; you can continue editing.” **Apply answers** maps answers to editable card fields.
+- **Step 3 Card:** two-column layout: editable form on the left, Coach/RatingPanel on the right. Include all §4.1 fields and tag inputs. Draft extracts show evidence and a **Use** action; never auto-insert them. Show confirmed score/progress and an optional clearly marked unsaved preview. Each quest has a point ceiling and **Add details** action that focuses the named field. **Confirm & score** commits the card.
+- **Step 4 Rating:** show previous and current confirmed scores, delta, before/after level, and a level-up notice only when a threshold is crossed. RatingPanel and quests show the next action. Buttons: **Improve** (back to step 3) · **Publish**.
 - **Step 5 Published:** confetti-lite message, catalog position, link to task.
 
 **B3. Task detail (owner)** (`/business/tasks/:id`)
-Tabs: **Card** (edit inline → Confirm & re-score; banner "Unconfirmed changes — catalog shows last confirmed version") · **Rating** (RatingPanel + history sparkline) · **Proposals** (compare table: team, tags, idea, plan, timeline, link, status; actions Select / Reject (optional reason) / Reset; on Selected: **Confirm milestone**).
+Tabs: **Card** (edit inline with Coach panel/progress/quests → Confirm & re-score; banner "Unconfirmed changes — catalog shows last confirmed version") · **Rating** (RatingPanel + before/after comparison; history sparkline optional) · **Proposals** (compare table: team, tags, idea, plan, timeline, link, status; actions Select / Reject (optional reason) / Reset; on Selected: **Confirm milestone**).
 
 **RatingPanel component**
 - Big score `72/100` + LevelBadge.
@@ -566,8 +573,9 @@ Tabs: **Card** (edit inline → Confirm & re-score; banner "Unconfirmed changes 
 - Delta chip after confirm: `+23 ▲` (green) / `−5 ▼` (red).
 - "Next level: Priority — 18 points needed".
 - Breakdown table: criterion · score/weight mini-bar · reason.
-- "How to raise your rating": missingDetails grouped by criterion, sorted by (weight − score) desc.
-- Source tag: AI / basic mode / cached.
+- "Improve Your Challenge": quests sorted by potential points, each with a short action, point ceiling, and **Add details** field shortcut. Explain that the full point gain requires the listed evidence.
+- Source tag: deterministic rules / seeded / cached. The AI/basic-mode badge belongs to clarification only.
+- Show “before → after” and a level-up notice after confirmation; never animate a preview as awarded points.
 - Catalog position "#2 of 5".
 
 ### 8.3 Team pages
@@ -575,10 +583,10 @@ Tabs: **Card** (edit inline → Confirm & re-score; banner "Unconfirmed changes 
 **T1. Catalog** (`/catalog`)
 - Top strip **Recommended for {team}** (≤3 cards with matched tags) — only for team role.
 - Filters: Topic (multi-select), Level (4 checkboxes). Count "Showing n of m".
-- Card list: position #, title, business name, LevelBadge, score bar, topics, tech tags, proposals count; priority → gold border + ★; draft → "Needs clarification".
+- Card list: position #, title, short confirmed-card summary, business name, LevelBadge, score bar, topics, tech tags, proposals count, **View details** CTA; priority → gold border + ★; draft → "Needs clarification".
 
 **T2. Task view** (`/catalog/:id`)
-Confirmed card (read-only), RatingPanel (compact), proposal form (idea, plan, timeline, prototype URL) → **Submit / Update proposal**; shows current status if exists (locked if decided).
+Confirmed card (read-only) with expected result, success criteria, and constraints prominent; compact RatingPanel; proposal form (solution idea, implementation plan, estimated duration, prototype URL) → **Submit / Update proposal**. Team name comes from the role switcher. Show existing status and lock edits after a decision.
 
 **T3. My proposals** (`/team/proposals`) — list with status badges + milestones.
 
@@ -598,16 +606,16 @@ Table: time, kind, task, model, validation result, latency. Expand row → syste
 **businesses.json**
 | id | name | industry | Role in demo |
 |---|---|---|---|
-| `b-nomad` | Nomad Logistics | Logistics | Fully filled card (Priority ~92) |
-| `b-steppe` | Steppe Retail | Retail | Medium card (Workable ~55) |
+| `b-nomad` | Nomad Logistics | Logistics | Fully filled card (Priority under §5.3 rules) |
+| `b-steppe` | Steppe Retail | Retail | Medium card (Workable under §5.3 rules) |
 | `b-tamaq` | Tamaq Café Chain | Food & Beverage | Live AI wizard demo (weak draft) |
 
-**tasks.json** (2 published cards; ratings precomputed, `source:"seed"`)
-1. **Nomad Logistics — "Delivery delay prediction dashboard"** — published, all fields rich: context (manual dispatching, 18% late deliveries), need, users (12 dispatchers), data (2 years of CSV route logs, ~400k rows, weather API), constraints (6 weeks, React/Python, read-only DB replica), expected result (web dashboard + delay model), success criteria (predict delays ≥30 min with ≥75% precision on holdout month), contact + weekly 30-min call + Slack feedback. Score **92 · priority**. topics: `logistics, data-analytics`; tech: `react, python, ml`.
-2. **Steppe Retail — "Customer review analysis"** — published, medium: context + need clear, data vague ("we have reviews"), expected result vague, no success criteria, users generic, contact only. Score **55 · workable**. topics: `retail, nlp`; tech: `dotnet, openai`.
+**tasks.json** (2 published cards; derive seeded ratings using the §5.3 rules and store `ratingRulesVersion`)
+1. **Nomad Logistics — "Delivery delay prediction dashboard"** — published, all fields rich: context (manual dispatching, 18% late deliveries), need, users (12 dispatchers), data (2 years of CSV route logs, ~400k rows, weather API), constraints (6 weeks, React/Python, read-only DB replica), expected result (web dashboard + delay model), success criteria (predict delays ≥30 min with ≥75% precision on holdout month), contact + weekly 30-min call + Slack feedback. Level **Priority** under the ruleset. topics: `logistics, data-analytics`; tech: `react, python, ml`.
+2. **Steppe Retail — "Customer review analysis"** — published, medium: context + need clear, data vague ("we have reviews"), expected result vague, no success criteria, users generic, contact only. Level **Workable** under the ruleset. topics: `retail, nlp`; tech: `dotnet, openai`.
 3. **Tamaq Café Chain** — its weak draft text lives in `drafts.json` and is typed/pasted live:
    > "We are a café chain. Customers stop coming back and we don't know why. Want some app to fix it."
-Expected wizard outcome: low initial score, then a visible increase after confirmed additions. Exact scores depend on the selected AI/stub mode; use a prepared, manually verified fixture for any scripted numeric claims.
+Expected wizard outcome: low initial score, then a visible increase after confirmed additions. The same card fields always produce the same score under one ruleset, regardless of AI mode; use a prepared, manually verified fixture for any scripted numeric claims.
 
 The `demo` profile may include a hidden editing backup card for rehearsal convenience; live creation does not count toward the `full` minimum.
 
@@ -628,12 +636,12 @@ Each team fixture also has a non-empty `skills` array, as required by the source
 ### 9.2 `full` profile (`/seed/full/`) — SoW §6 minimum
 Includes `demo` content plus enough persisted records to contain at least 5 drafts, 5 complete task cards, 5 team profiles, and 5 proposals immediately after seed. Counts never depend on the live demo.
 - businesses: `b-kazagro` (Agriculture), `b-edutech` (Education)
-- tasks: Kazagro "Crop yield reporting" **~31 · draft**; EduTech "Student attendance insights" **~78 · ready**; plus `t-tamaq-backup` as a complete, confirmed editing card → at least 5 card documents with every rating field. This backup remains hidden from the catalog.
+- tasks: Kazagro "Crop yield reporting" (**Draft** under the ruleset); EduTech "Student attendance insights" (**Ready**); plus `t-tamaq-backup` as a complete, confirmed editing card → at least 5 card documents with every rating field. This backup remains hidden from the catalog.
 - teams: `t-greenbits`, `t-pixelforge`, `t-dataweavers` → at least 5 teams, each with name, interests, skills, and technologies
 - proposals: +3 (EduTech ← greenbits, Kazagro ← dataweavers, Steppe ← pixelforge) → at least 5 proposals, each with team, idea, plan, timeline, and link field
 - drafts.json: at least 5 distinct drafts of varying completeness (very weak / weak / medium / good / complete)
 
-Seeded ratings are stored as-is (no AI call on seed). First edit+confirm triggers real scoring.
+The seed loader calculates each rating with the same versioned backend rules as confirmation; no AI call runs on seed. A later edit and confirmation recalculates it with those rules. Do not hardcode score totals that disagree with the fields.
 
 ---
 
@@ -771,7 +779,7 @@ orval config: input `./openapi.json`, output `src/api/`, client `react-query`, c
 ### 11.1 `AGENTS.md` (committed, both agents read it)
 ```markdown
 # AGENTS.md — TaskForge
-Spec: docs/MVP_SPEC.md (source of truth). Briefs: docs/tasks/*.md.
+Spec: MVP_SPEC.md (source of truth). Briefs: docs/tasks/*.md.
 
 ## Stack
 .NET 10 Minimal API (api/), React+Vite+TS+Tailwind+shadcn (web/), Firestore (emulator locally), OpenAI Responses API.
@@ -800,9 +808,9 @@ Before finishing: build (`dotnet build` / `npm run build`) and report changed fi
 | File | Owner | Content |
 |---|---|---|
 | `00-scaffold.md` | A+B | Repo tree, compose, empty endpoints returning stub DTOs, OpenAPI on |
-| `A1-openai-client.md` | A | ResponsesClient, schemas, prompts §5.2/5.3 verbatim |
+| `A1-openai-client.md` | A | ResponsesClient, analyze schema and prompt §5.2 |
 | `A2-analyze.md` | A | Analyze endpoint, validator, evidence check, stub, aiLogs |
-| `A3-score.md` | A | Score call, RatingGuard, hash cache, history, levels, stub |
+| `A3-score.md` | A | Backend readiness rules §5.3, quests, cache, history, levels, preview |
 | `A4-wizard-ui.md` | A | Wizard steps 1–5, chips, suggestions, provenance |
 | `A5-rating-panel.md` | A | RatingPanel, delta, next level, AI logs page |
 | `B1-firestore-repos.md` | B | Repos, models, seed/reset loader, actors endpoint |
@@ -817,27 +825,27 @@ Each brief: goal · files to touch · DTOs/endpoints · acceptance checks (manua
 
 ## 12. Work split — 2 developers, 240 min
 
-**Dev A — AI track:** OpenAI client, analyze, score, rating guard, wizard UI, RatingPanel, AI logs.
+**Dev A — Coach and rating track:** OpenAI analyze, deterministic rating/quests, wizard UI, RatingPanel, AI logs.
 **Dev B — Core track:** scaffold, Firestore, seed, CRUD, catalog, recommendations, proposals, decisions, milestones, leaderboard, deploy.
 
 | Time | Dev A | Dev B | Sync point |
 |---|---|---|---|
-| 0:00–0:20 | Agree spec, write AGENTS.md, briefs A1–A5 | Scaffold repo, compose, emulator, API skeleton with all endpoints returning stub DTOs, OpenAPI | **0:20** contract frozen, client generated |
-| 0:20–1:15 | A1 OpenAI client + A2 analyze (+stub, validator, logs) | B1 Firestore repos, seed/reset (demo profile), `/actors`, role switcher UI, app shell | 1:15 merge; analyze callable via Swagger |
-| 1:15–2:15 | A4 Wizard UI steps 1–3 (draft, clarify w/ chips, card editor); A3 score endpoint + guard | B2 tasks CRUD (answers merge, fields, confirm → calls A3 service, publish), My Tasks page; B3 catalog API + UI + filters + position | **2:15** end-to-end: draft → publish visible in catalog |
-| 2:15–3:00 | A5 RatingPanel (delta, next level, missing details), wizard steps 4–5, post-publish edit flow | B3 recommendations; B4 proposals (team form, business compare table, decisions, milestones, leaderboard) | 3:00 merge; full flow locally |
-| 3:00–3:20 | Stub mode check (`AI_MODE=stub`), AI logs page, error toasts | B5 deploy API (Cloud Run) + web (Netlify), CORS, seed prod | **3:20** deployed |
-| 3:20–3:45 | Bugfix from rehearsal #1 | Bugfix from rehearsal #1, `full` seed profile | **3:45 CODE FREEZE** |
-| 3:45–4:00 | README (architecture, formula, catalog rules, scenarios) | Rehearsal #2 on prod, backup local compose ready | Demo |
+| 0:00–0:20 | Agree spec, write AGENTS.md, briefs A1–A5 | Scaffold repo and API contract; prepare synthetic fixtures meeting the `full` source-data minimum | **0:20** contract frozen, client generated |
+| 0:20–1:15 | A1 OpenAI client + A2 analyze (+stub, validator, logs) | B1 Firestore repos, seed/reset (`full` and `demo` profiles), `/actors`, role switcher UI, app shell | 1:15 merge; analyze callable via Swagger |
+| 1:15–2:15 | A4 Wizard UI steps 1–3 (draft, clarify w/ chips, card editor); A3 deterministic rating/quests + preview endpoint | B2 tasks CRUD (answers merge, fields, confirm → calls A3 service, publish), My Tasks page; B3 catalog API + UI + filters + position | **2:15** end-to-end: draft → publish visible in catalog |
+| 2:15–3:00 | A5 Coach/RatingPanel (progress, quests, delta, level-up), wizard steps 4–5, post-publish edit flow | B4 proposals (team form, business compare table, manual decisions); then B3 recommendations | **3:00** mandatory flow locally |
+| 3:00–3:20 | Stub mode check (`AI_MODE=stub`), AI logs page, error toasts | Milestones/leaderboard; if local flow is stable, B5 deploy API + web and CORS | **3:20** local rehearsal complete |
+| 3:20–3:45 | Bugfix from rehearsal #1 | Bugfix from rehearsal #1; check `full` seed counts and scored levels | **3:45 CODE FREEZE** |
+| 3:45–4:00 | README (architecture, formula, catalog rules, scenarios) | Rehearsal #2 on the running demo environment; keep local compose ready | Demo |
 
 ### Cut list (in order, if behind)
-1. AI logs page → show `aiLogs` in Firestore console instead
-2. Rating history sparkline
-3. Leaderboard page (keep points on team badge)
-4. Recommendations strip
-5. Milestones (SoW step 8, not in mandatory demo)
-6. Netlify/Cloud Run → demo from local compose
-**Never cut:** wizard, rating recalc + delta, catalog sort/filters, proposal, manual decision.
+1. Netlify/Cloud Run → demo from local compose (production deployment is not an MVP requirement)
+2. AI logs page → show prompt/schema, one real response, invalid-response handling in the README/demo
+3. Rating history sparkline (keep confirmed before/after values)
+4. Leaderboard page (keep confirmed points on team badge)
+5. Recommendations strip
+6. Milestones (SoW step 8, outside the mandatory defense flow)
+**Never cut:** AI clarification, editable card, deterministic score/breakdown, Coach progress/quests, confirmed score increase/level-up, catalog sort/filters, proposal, manual decision.
 
 ---
 
@@ -845,7 +853,7 @@ Each brief: goal · files to touch · DTOs/endpoints · acceptance checks (manua
 1. What it is (3 lines) + screenshot
 2. Architecture diagram (§3) + stack
 3. Launch: `cp .env.example .env` → set key → `docker compose up --build` → `curl -X POST localhost:8080/api/admin/seed?profile=demo` → open `localhost:5173`
-4. Rating formula: rubric table §4.2, levels §4.3, guard rules §5.3, recalculation rule
+4. Rating formula: rubric table §4.2, deterministic evidence checks §5.3, levels §4.3, preview/confirmation rule
 5. AI: prompts, input/output schemas, invalid-response handling §5.4, "no invented facts" measures
 6. Catalog rules §6.3, recommendations §6.4, decision rules §6.5
 7. Data model §4.4, seed profiles §9
@@ -858,25 +866,44 @@ Each brief: goal · files to touch · DTOs/endpoints · acceptance checks (manua
 
 | # | Scenario | Expected |
 |---|---|---|
-| S1 | Seed demo, open catalog as Byte Nomads | Nomad (92, ★ Priority) above Steppe (55, Workable); recommendations show Nomad with matched tags |
+| S1 | Seed demo, open catalog as Byte Nomads | Nomad (Priority) above Steppe (Workable); displayed totals match §5.3 rules and recommendations explain matching tags |
 | S2 | Filter level = Workable | Only Steppe; position still `#2 of 2` |
 | S3 | As Tamaq: paste weak draft → Analyze | 3–7 questions, ≤4 chips each, suggestions list, AI badge |
-| S4 | Answer via chips + free text → Apply → Confirm | Card filled; score ~40–65, level Workable, breakdown + missing details |
-| S5 | Improve 2 fields → Confirm | Delta `+N ▲`, level up, catalog position changes |
+| S4 | Answer via chips + free text → Apply → Confirm | Editable card is filled from user answers; confirmed score, progress, breakdown, and highest-value quests are visible |
+| S5 | Add missing data and success criteria, preview, then Confirm | Preview is marked unawarded; confirmed score/delta rises and before/after appears; catalog position changes only if already published |
 | S6 | Confirm again without changes | Same score, source "cached" |
 | S7 | Publish, switch to Null Pointers → catalog | Tamaq visible at correct position; submit proposal |
 | S8 | Submit proposal with invalid URL | Validation error shown, nothing saved |
 | S9 | As Tamaq → Proposals → Select Null Pointers | Status Selected; team sees it in My proposals |
 | S10 | As Nomad → reject Null Pointers, select Byte Nomads, confirm milestone | Statuses updated; Byte Nomads +10 on leaderboard; decision locked |
-| S11 | Set `AI_MODE=stub`, restart, run S3–S4 | Template questions, amber "basic mode" badge, rule-based score |
+| S11 | Set `AI_MODE=stub`, restart, run S3–S4 | Template questions and amber clarification badge; same confirmed fields receive the same backend score |
 | S12 | Edit published task field, don't confirm | Catalog still shows old version; banner "Unconfirmed changes" |
-| S13 | AI logs page | analyze/score entries with prompt, input, raw output, validation status |
-| S14 | Force malformed AI output, then exhaust retry | One retry occurs, deterministic stub is used, source/badge and both log entries explain fallback |
-| S15 | Confirm a revision, edit and confirm another revision, then restore the original fields | Original cache key/result is reused; stub result is never returned as live AI scoring |
+| S13 | AI logs page | analyze entries with prompt, input, raw output, validation status |
+| S14 | Force malformed AI output, then exhaust retry | One retry occurs, deterministic question stub is used, and attempt/fallback logs explain the failure |
+| S15 | Confirm a revision, edit and confirm another revision, then restore the original fields | Original cache key/result is reused; score is independent of AI mode; repeated confirm adds no history entry |
 | S16 | Submit the same answers twice; confirm the same milestone twice | Answer text is not duplicated; milestone awards team points once |
+| S17 | Seed `full` and count records | At least 5 drafts, 5 complete cards, 5 teams with skills, and 5 proposals exist before demo interaction |
 
 ---
 
+
+## 15. Five-minute demo script (SoW §11)
+
+| Time | Actor | Action | Show |
+|---|---|---|---|
+| 0:00 | Team | Open ranked catalog | Priority task appears above Workable; low-rated tasks remain visible. |
+| 0:25 | Business | Enter weak request, select **Analyze with AI** | Coach identifies gaps and asks at least three relevant questions. |
+| 1:05 | Business | Answer questions, inspect editable card | User-provided facts are distinct from AI wording; no fact is silently invented. |
+| 1:40 | Business | Confirm card | Readiness progress, criterion breakdown, next threshold, and high-value quests appear. |
+| 2:15 | Business | Follow **Add details** for data and success criteria; preview, then confirm | Before/after score and actual delta appear; show the level-up notice if the prepared fixture crosses 70. |
+| 3:00 | Business | Publish | Confirmed card enters the shared catalog at its score-based position. |
+| 3:25 | Team | Open task and submit idea, plan, duration, and prototype link | Proposal appears for the business; recommendations never restrict access. |
+| 4:05 | Business | Compare proposals and manually select or reject | Decision and team-visible status update; no automatic assignment. |
+| 4:35 | Presenter | Show prompt/schema and an AI log entry | Explain malformed-output retry and deterministic fallback. |
+
+Rehearse with a prepared fixture whose confirmed fields cross a threshold under the current `ratingRulesVersion`. Read actual scores from the running app; example values in the AI Challenge Coach reference are illustrative. Keep local Compose with `AI_MODE=stub` available as a fallback.
+
+---
 
 ## 16. Evaluation mapping (SoW §9)
 
