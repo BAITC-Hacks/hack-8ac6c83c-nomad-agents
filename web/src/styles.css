@@ -1,3 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 243 75% 63%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 243 75% 63%;
+  --radius: 0.5rem;
+}
+
 :root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #202a3b; background: #f5f7fb; font-synthesis: none; text-rendering: optimizeLegibility; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
@@ -39,7 +66,7 @@ button, select { font: inherit; }
 .demo-banner { max-width: 1080px; margin: 0 auto 18px; padding: 12px 16px; border: 1px solid #f5d58a; border-radius: 10px; background: #fffbeb; color: #805c0a; font-size: 13px; }
 .content-page { max-width: 1000px; margin: auto; }
 .content-page h1 { margin-top: 0; }
-.content-page input, .proposal-form input, .proposal-form textarea, .review input { width: 100%; margin: 6px 0 13px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
+.content-page input:not([class]), .proposal-form input:not([class]), .proposal-form textarea, .review input:not([class]) { width: 100%; margin: 6px 0 13px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
 .proposal-form label, .review label { display: block; font-weight: 600; font-size: 14px; }
 .proposal-form textarea { resize: vertical; }
 .review-list, .proposal-list, .log-list { display: grid; gap: 14px; }
@@ -47,8 +74,6 @@ button, select { font: inherit; }
 .review-heading, .review-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .review-heading { justify-content: space-between; }.review-heading h2, .review-heading h3 { margin: 0; }
 .review-card dt { font-weight: 700; margin-top: 10px; }.review-card dd { margin: 3px 0 8px; white-space: pre-wrap; }
-.review-actions button, .milestone-form button { padding: 9px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; cursor: pointer; }
-.review-actions button:first-child { background: #2563eb; color: white; border-color: #2563eb; }
 .review-actions button:disabled, .milestone-form button:disabled { opacity: .5; cursor: default; }
 .status { display: inline-block; padding: 4px 10px; border-radius: 20px; background: #f1f5f9; text-transform: capitalize; font-size: 12px; font-weight: 700; }
 .status-selected { background: #dcfce7; color: #166534; }.status-rejected { background: #fee2e2; color: #991b1b; }

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/http";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 
 type Proposal = { id: string; teamName: string; tags?: string[]; idea: string; plan: string; timeline: string; prototypeUrl?: string; status: "pending" | "selected" | "rejected"; reason?: string; milestones?: { id: string; title: string }[] };
 export default function ProposalReview({ taskId }: { taskId: string }) {
@@ -32,9 +34,9 @@ export default function ProposalReview({ taskId }: { taskId: string }) {
       {p.tags?.length ? <p>Tags: {p.tags.join(", ")}</p> : null}
       <dl><dt>Idea</dt><dd>{p.idea}</dd><dt>Plan</dt><dd>{p.plan}</dd><dt>Timeline</dt><dd>{p.timeline}</dd></dl>
       {p.prototypeUrl && <a href={p.prototypeUrl} target="_blank" rel="noreferrer">Open prototype</a>}
-      <label>Decision reason (optional)<input value={reason[p.id] ?? p.reason ?? ""} onChange={e => setReason(old => ({ ...old, [p.id]: e.target.value }))} /></label>
-      <div className="review-actions"><button disabled={busy === p.id || p.status === "selected"} onClick={() => decide(p.id, "selected")}>Select</button><button disabled={busy === p.id || p.status === "rejected"} onClick={() => decide(p.id, "rejected")}>Reject</button>{p.status !== "pending" && !(p.milestones?.length) && <button disabled={busy === p.id} onClick={() => decide(p.id, "pending")}>Reset</button>}</div>
-      {p.status === "selected" && <div className="milestone-form"><label>Confirmed milestone title<input value={milestone[p.id] ?? ""} onChange={e => setMilestone(old => ({ ...old, [p.id]: e.target.value }))} placeholder="e.g. Prototype reviewed" /></label><button disabled={busy === p.id} onClick={() => confirmMilestone(p.id)}>Confirm milestone (+10 points)</button></div>}
+      <label>Decision reason (optional)<Input value={reason[p.id] ?? p.reason ?? ""} onChange={e => setReason(old => ({ ...old, [p.id]: e.target.value }))} /></label>
+      <div className="review-actions"><Button disabled={busy === p.id || p.status === "selected"} onClick={() => decide(p.id, "selected")}>Select</Button><Button variant="destructive" disabled={busy === p.id || p.status === "rejected"} onClick={() => decide(p.id, "rejected")}>Reject</Button>{p.status !== "pending" && !(p.milestones?.length) && <Button variant="outline" disabled={busy === p.id} onClick={() => decide(p.id, "pending")}>Reset</Button>}</div>
+      {p.status === "selected" && <div className="milestone-form"><label>Confirmed milestone title<Input value={milestone[p.id] ?? ""} onChange={e => setMilestone(old => ({ ...old, [p.id]: e.target.value }))} placeholder="e.g. Prototype reviewed" /></label><Button disabled={busy === p.id} onClick={() => confirmMilestone(p.id)}>Confirm milestone (+10 points)</Button></div>}
       {!!p.milestones?.length && <p>Confirmed milestones: {p.milestones.map(m => m.title).join(", ")}</p>}
     </article>)}</div>
   </section>;
