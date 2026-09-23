@@ -14,7 +14,7 @@ Target users: businesses posting challenges for students (need help writing a cl
 
 ## 3. Implementation details (what exists in this repository today)
 
-### Backend (`api/`) — .NET 10 Minimal API
+### Backend (`api/`) — .NET 9 Minimal API
 - Feature-folder structure per `MVP_SPEC.md` §3 (`api/Features/<Feature>/Endpoints.cs`, `Dtos.cs`).
 - **Implemented:** `GET /api/health` (`api/Features/Health/`) — returns API status; does not yet check Firestore (`firestore: "not_checked"`).
 - OpenAPI/Swagger is wired up in Development (`http://localhost:8080/swagger/`, `http://localhost:8080/openapi/v1.json`); the generated document currently only lists `/api/health` because no other feature routes are mapped yet.
@@ -51,7 +51,7 @@ Everything above runs entirely against the in-browser sample dataset today; ther
 
 ## 5. Technologies
 
-- **Backend:** .NET 10 (Minimal APIs), C#, built-in OpenAPI + Swagger UI, Docker.
+- **Backend:** .NET 9 (Minimal APIs), C#, built-in OpenAPI + Swagger UI, Docker.
 - **Frontend:** React 18, TypeScript, Vite 5.
 - **Planned per `MVP_SPEC.md`** (not yet wired in code): Firestore (native mode, via emulator locally), OpenAI Responses API (mini-tier model, name via `OPENAI_MODEL` env var), TanStack Query, Tailwind CSS + shadcn/ui, orval-generated typed API client.
 - **Infra:** Docker Compose (API + Firestore emulator + Vite dev server), `.env` / `.env.example` for local configuration.
@@ -60,7 +60,7 @@ Everything above runs entirely against the in-browser sample dataset today; ther
 
 ```
 ┌──────────────┐   HTTPS/JSON   ┌───────────────────────────┐
-│ React SPA    │ ─────────────► │ .NET 10 Minimal API        │
+│ React SPA    │ ─────────────► │ .NET 9 Minimal API         │
 │ (Vite, :5173)│  X-Actor-*     │ (Cloud Run target, :8080)  │
 │              │ ◄── fallback ─ │  Features/Health/ (only)   │
 └──────────────┘   sample data  └───────────────────────────┘
@@ -80,7 +80,7 @@ Local dev: docker compose up --build  →  web (vite) + api + firestore-emulator
 
 ## 7. Installation and setup
 
-Requires the **.NET 10 SDK** and **Node.js** for a host run, or **Docker + Docker Compose** for a containerized run.
+Requires the **.NET 9 SDK** and **Node.js** for a host run, or **Docker + Docker Compose** for a containerized run.
 
 ### Option A — Docker Compose (recommended, runs all three services)
 ```sh
@@ -91,14 +91,6 @@ This starts the Firestore emulator (`localhost:8081`), the API (`localhost:8080`
 
 ### Option B — Run services directly on the host
 Backend:
-# hack-8ac6c83c-nomad-agents
-Hackathon team repository for Nomad Agents
-
-## API baseline (B00)
-
-Requires the .NET 9 SDK for a host run, or Docker with Compose for a container run.
-From the repository root:
-
 ```sh
 dotnet build api/TaskForge.Api.csproj
 dotnet run --project api/TaskForge.Api.csproj
