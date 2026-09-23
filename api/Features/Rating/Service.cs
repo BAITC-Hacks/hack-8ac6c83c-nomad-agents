@@ -1,142 +1,241 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
+using System.Text.RegularExpressions;
 using TaskForge.Api.Domain;
-using TaskForge.Api.Infrastructure.InMemory;
-using RatingModel = TaskForge.Api.Domain.Rating;
 
 namespace TaskForge.Api.Features.Rating;
 
-public sealed class RatingService(IRatingCacheRepository cache)
+/// <summary>Deterministic, versioned readiness rules. This service accepts fields only;</summary>
+/// <summary>callers are responsible for passing the confirmed snapshot for an awarded rating.</summary>
+public sealed class RatingService
 {
-    public RatingModel Score(ConfirmedTaskSnapshot confirmed) => ScoreFields(confirmed.Fields);
+    public const string RulesVersion = "en-mvp-1";
 
-    // B4 passes its captured fields, then persists the result with that revision atomically.
-    // B7 can use the same method; neither method awards points or writes task/history state.
-    public RatingModel ScoreFields(TaskFields fields)
+    private static readonly CriterionRule[] Rules =
+    [
+        new("contextAndNeed", 20, ["context", "need"], ContextNeed),
+        new("dataAndMaterials", 20, ["data"], Data),
+        new("expectedResult", 15, ["expectedResult"], ExpectedResult),
+        new("successCriteria", 15, ["successCriteria"], SuccessCriteria),
+        new("constraints", 10, ["constraints"], Constraints),
+        new("users", 10, ["users"], Users),
+        new("businessConnection", 10, ["contact", "interactionFormat"], BusinessConnection)
+    ];
+
+    public TaskForge.Api.Domain.Rating Calculate(TaskFields confirmedFields, DateTimeOffset scoredAt)
     {
-        var key = CacheKey(fields);
-        var existing = cache.Get(key);
-        if (existing is not null) return existing with { Source = RatingSources.Cache };
-        var calculated = Calculate(fields, key);
-        var saved = cache.GetOrAdd(calculated);
-        return ReferenceEquals(saved, calculated) ? saved : saved with { Source = RatingSources.Cache };
-    }
+        ArgumentNullException.ThrowIfNull(confirmedFields);
 
-    // Pure preview: no cache insertion, task changes, or history entry.
-    public RatingModel Preview(TaskFields fields) => Calculate(fields, CacheKey(fields));
-
-    public static string Level(int total) => total switch
-    {
-        < 40 => ReadinessLevels.Draft,
-        < 70 => ReadinessLevels.Workable,
-        < 90 => ReadinessLevels.Ready,
-        _ => ReadinessLevels.Priority
-    };
-
-    public static NextLevelDto? NextLevel(int total) => total switch
-    {
-        < 40 => new(ReadinessLevels.Workable, 40 - total),
-        < 70 => new(ReadinessLevels.Ready, 70 - total),
-        < 90 => new(ReadinessLevels.Priority, 90 - total),
-        _ => null
-    };
-
-    public static string CacheKey(TaskFields fields)
-    {
-        // Fixed property order, normalized scalar text, and order-independent tag sets.
-        var canonical = JsonSerializer.Serialize(new
+        var breakdown = Rules.Select(rule => Evaluate(rule, confirmedFields)).ToArray();
+        var total = breakdown.Sum(item => item.Score);
+        var level = total switch
         {
-            version = ReadinessRules.Version,
-            title = ReadinessRules.Normalize(fields.Title),
-            context = ReadinessRules.Normalize(fields.Context), need = ReadinessRules.Normalize(fields.Need),
-            users = ReadinessRules.Normalize(fields.Users), data = ReadinessRules.Normalize(fields.Data),
-            constraints = ReadinessRules.Normalize(fields.Constraints), expectedResult = ReadinessRules.Normalize(fields.ExpectedResult),
-            successCriteria = ReadinessRules.Normalize(fields.SuccessCriteria), contact = ReadinessRules.Normalize(fields.Contact),
-            interactionFormat = ReadinessRules.Normalize(fields.InteractionFormat),
-            topics = Tags(fields.Topics), techTags = Tags(fields.TechTags)
-        });
-        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
+            < 40 => ReadinessLevels.Draft,
+            < 70 => ReadinessLevels.Workable,
+            < 90 => ReadinessLevels.Ready,
+            _ => ReadinessLevels.Priority
+        };
+        var missing = breakdown
+            .Where(item => item.Score < item.Weight)
+            .Select(item => new MissingDetail(item.Criterion, item.Reason))
+            .Take(3)
+            .ToArray();
+        var quests = breakdown
+            .Where(item => item.Score < item.Weight)
+            .Select(item => MakeQuest(item, confirmedFields))
+            .OrderByDescending(item => item.PotentialPoints)
+            .ThenBy(item => Array.FindIndex(Rules, rule => rule.Key == item.Criterion))
+            .ToArray();
 
-        static string[] Tags(IReadOnlyList<string> tags) => tags.Select(ReadinessRules.Normalize)
-            .Where(t => t.Length > 0).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        return new TaskForge.Api.Domain.Rating(
+            total,
+            level,
+            breakdown,
+            missing,
+            quests,
+            RatingSources.Rules,
+            RulesVersion,
+            MakeCacheKey(confirmedFields),
+            scoredAt);
     }
 
-    private static RatingModel Calculate(TaskFields fields, string key)
+    private static RatingBreakdownItem Evaluate(CriterionRule rule, TaskFields fields)
     {
-        List<RatingBreakdownItem> rows = [];
-        List<MissingDetail> details = [];
-        List<ImprovementQuest> quests = [];
-        var context = ReadinessRules.Normalize(fields.Context);
-        var need = ReadinessRules.Normalize(fields.Need);
-        var contextPresent = ReadinessRules.Present(context);
-        var needPresent = ReadinessRules.Present(need);
-        Add("contextAndNeed", 20, contextPresent || needPresent, contextPresent && needPresent,
-            Array.AsReadOnly(new[] { contextPresent ? "context.present" : "", needPresent ? "need.present" : "" }.Where(s => s != "").ToArray()),
-            [new("context.present", "context", "Describe the current situation", contextPresent),
-             new("need.present", "need", "Describe what needs to change", needPresent)], false);
-
-        var data = ReadinessRules.Normalize(fields.Data);
-        var signals = ReadinessRules.DataSignals(data);
-        var source = signals.Contains("data.source");
-        var detail = signals.Any(s => s is "data.format" or "data.quantity" or "data.access");
-        Add("dataAndMaterials", 20, ReadinessRules.Present(data), source && detail, signals,
-            [new("data.source", "data", "Name an available data source or example", source),
-             new("data.format / data.quantity / data.access", "data", "Specify a data format, quantity, or access method", detail)]);
-
-        var result = ReadinessRules.Normalize(fields.ExpectedResult);
-        signals = ReadinessRules.ResultSignals(result);
-        Add("expectedResult", 15, ReadinessRules.Present(result), signals.Count == 2, signals,
-            [new("result.artifact", "expectedResult", "Name the deliverable", signals.Contains("result.artifact")),
-             new("result.function", "expectedResult", "Describe what that deliverable must do", signals.Contains("result.function"))]);
-
-        var success = ReadinessRules.Normalize(fields.SuccessCriteria);
-        signals = ReadinessRules.SuccessSignals(success);
-        Add("successCriteria", 15, ReadinessRules.Present(success), signals.Count == 2, signals,
-            [new("success.outcome", "successCriteria", "Name the outcome or measure", signals.Contains("success.outcome")),
-             new("success.acceptance", "successCriteria", "Define a target with a comparator and unit, or a concrete acceptance check", signals.Contains("success.acceptance"))]);
-
-        var constraints = ReadinessRules.Normalize(fields.Constraints);
-        signals = ReadinessRules.ConstraintSignals(constraints);
-        Add("constraints", 10, ReadinessRules.Present(constraints), signals.Count >= 2, signals,
-            [new("constraints.distinctCategories", "constraints", signals.Count == 0
-                ? "State two boundaries from time, technology, access, legal, or budget"
-                : "Add a boundary from a different category: time, technology, access, legal, or budget", signals.Count >= 2)]);
-
-        var users = ReadinessRules.Normalize(fields.Users);
-        signals = ReadinessRules.UserSignals(users);
-        Add("users", 10, ReadinessRules.Present(users), signals.Count == 2, signals,
-            [new("users.group", "users", "Name the user group", signals.Contains("users.group")),
-             new("users.usage", "users", "Explain what that group does with the result", signals.Contains("users.usage"))]);
-
-        var contact = ReadinessRules.Normalize(fields.Contact);
-        var interaction = ReadinessRules.Normalize(fields.InteractionFormat);
-        signals = ReadinessRules.ConnectionSignals(contact, interaction);
-        Add("businessConnection", 10, ReadinessRules.Present(contact) || ReadinessRules.Present(interaction), signals.Count == 3, signals,
-            [new("contact.present", "contact", "Add a contact person and channel", signals.Contains("contact.present")),
-             new("interaction.consultation", "interactionFormat", "Specify the consultation format or cadence", signals.Contains("interaction.consultation")),
-             new("interaction.feedback", "interactionFormat", "Describe the feedback procedure", signals.Contains("interaction.feedback"))]);
-
-        var total = rows.Sum(row => row.Score);
-        return new(total, Level(total), rows.AsReadOnly(), details.AsReadOnly(),
-            Array.AsReadOnly(quests.OrderByDescending(q => q.PotentialPoints).ToArray()),
-            RatingSources.Rules, ReadinessRules.Version, key, DateTimeOffset.UtcNow);
-
-        void Add(string criterion, int weight, bool present, bool full, IReadOnlyList<string> matched,
-            Condition[] conditions, bool englishEvidence = true)
+        var result = rule.Check(fields);
+        var score = result.Score switch
         {
-            var score = !present ? 0 : full ? weight : weight / 2;
-            var missing = conditions.Where(c => !c.Matched).Take(3).ToArray();
-            var reason = full ? $"Full credit: {string.Join(", ", matched)}."
-                : (!present ? "Empty (fewer than three non-space characters). " : "Half credit for supplied content. ") +
-                  "Missing evidence: " + string.Join("; ", missing.Select(c => $"{c.Signal}: {c.Action}")) + ".";
-            if (!full && present && englishEvidence) reason += " " + ReadinessRules.LanguageLimitation;
-            rows.Add(new(criterion, weight, score, reason, matched));
-            foreach (var condition in missing) details.Add(new(criterion, condition.Action));
-            if (score < weight && missing.Length > 0)
-                quests.Add(new(criterion, missing[0].Field, missing[0].Action, weight - score));
-        }
+            -1 => rule.Weight,
+            -2 => rule.Weight / 2,
+            _ => 0
+        };
+        return new RatingBreakdownItem(rule.Key, rule.Weight, score, result.Reason, result.Signals);
     }
 
-    private sealed record Condition(string Signal, string Field, string Action, bool Matched);
+    private static ImprovementQuest MakeQuest(RatingBreakdownItem item, TaskFields fields)
+    {
+        var key = item.Criterion switch
+        {
+            "contextAndNeed" => IsEmpty(fields.Context) ? "context" : "need",
+            "dataAndMaterials" => "data",
+            "expectedResult" => "expectedResult",
+            "successCriteria" => "successCriteria",
+            "constraints" => "constraints",
+            "users" => "users",
+            "businessConnection" => IsEmpty(fields.Contact) ? "contact" : "interactionFormat",
+            _ => throw new InvalidOperationException("Unknown rating criterion.")
+        };
+        var action = item.Criterion switch
+        {
+            "contextAndNeed" => IsEmpty(fields.Context)
+                ? "Describe the current situation."
+                : "Describe what needs to change.",
+            "dataAndMaterials" => "Name an available source and how the team can inspect it.",
+            "expectedResult" => "Name the deliverable and what it must do.",
+            "successCriteria" => "Define an outcome and a measurable target or acceptance check.",
+            "constraints" => "Add another deadline, technology, access, legal, or budget boundary.",
+            "users" => "Explain what the named user group does with the result.",
+            "businessConnection" => IsEmpty(fields.Contact)
+                ? "Add a business contact."
+                : "Describe consultation and how feedback will be given.",
+            _ => throw new InvalidOperationException("Unknown rating criterion.")
+        };
+        return new ImprovementQuest(item.Criterion, key, action, item.Weight - item.Score);
+    }
+
+    private static CheckResult ContextNeed(TaskFields f)
+    {
+        var context = Present(f.Context);
+        var need = Present(f.Need);
+        if (!context && !need) return Zero("Both the current situation and needed change are missing.");
+        if (!context) return Half("The current situation is missing.", "need.present");
+        if (!need) return Half("What needs to change is missing.", "context.present");
+        return Full("Current situation and needed change are present.", "context.present", "need.present");
+    }
+
+    private static CheckResult Data(TaskFields f)
+    {
+        var text = Normalize(f.Data);
+        if (IsEmpty(text)) return Zero("Name a data source and an inspection detail.");
+        var source = HasPhrase(text, "logs", "transactions", "purchase history", "reviews", "orders", "records", "dataset", "database", "files", "documents", "survey", "api", "route data");
+        var format = HasPhrase(text, "csv", "xlsx", "excel", "json", "pdf", "sql", "api");
+        var quantity = HasRegex(text, @"\b\d+(?:[.,]\d+)?\s*(?:k|m|b)?\s*(?:rows?|records?|files?|months?|years?|gb|mb)\b");
+        var access = HasPhrase(text, "read-only", "export", "shared folder", "api access", "replica", "sample provided");
+        var signals = new List<string>();
+        if (source) signals.Add("data.source");
+        if (format) signals.Add("data.format");
+        if (quantity) signals.Add("data.quantity");
+        if (access) signals.Add("data.access");
+        if (source && (format || quantity || access)) return Full("A data source and an inspection detail are identified.", signals.ToArray());
+        var absent = !source ? "a recognizable data source" : "a format, quantity, or access detail";
+        return Half($"Nonempty data is present, but the detector could not establish {absent}.", signals.ToArray());
+    }
+
+    private static CheckResult ExpectedResult(TaskFields f)
+    {
+        var text = Normalize(f.ExpectedResult);
+        if (IsEmpty(text)) return Zero("Name a deliverable and what it must do.");
+        var artifact = HasPhrase(text, "dashboard", "app", "website", "report", "model", "prototype", "api", "tool", "service");
+        var function = HasPhrase(text, "predict", "display", "track", "classify", "summarize", "alert", "search", "recommend", "analyze");
+        var signals = Signals((artifact, "result.artifact"), (function, "result.function"));
+        if (artifact && function) return Full("A deliverable and its function are identified.", signals);
+        return Half($"Nonempty result is present, but the detector could not establish {(artifact ? "what the deliverable must do" : "a recognizable deliverable") }.", signals);
+    }
+
+    private static CheckResult SuccessCriteria(TaskFields f)
+    {
+        var text = Normalize(f.SuccessCriteria);
+        if (IsEmpty(text)) return Zero("Define an outcome and a measurable target or acceptance check.");
+        var outcome = HasPhrase(text, "predict delays", "accuracy", "precision", "recall", "conversion", "response time", "error rate", "completion rate");
+        var measured = HasRegex(text, @"\b(?:at least|no more than|under|over|>=|<=|≥|≤)\s*\d+(?:[.,]\d+)?\s*(?:%|seconds?|minutes?|days?|users?|records?)(?:\b|(?=\s|$|[,.;]))");
+        var accepted = HasRegex(text, @"\b(?:accepted if|passes)\b.{1,100}\b(?:test|deliverable|check|scenario|case)\b");
+        var acceptance = measured || accepted;
+        var signals = Signals((outcome, "success.outcome"), (measured, "success.acceptance.measure"), (accepted, "success.acceptance.check"));
+        if (outcome && acceptance) return Full("An outcome and measurable acceptance condition are present.", signals);
+        var absent = !outcome ? "a recognizable outcome" : "a measurable target or concrete acceptance check";
+        return Half($"Nonempty criteria are present, but the detector could not establish {absent}.", signals);
+    }
+
+    private static CheckResult Constraints(TaskFields f)
+    {
+        var text = Normalize(f.Constraints);
+        if (IsEmpty(text)) return Zero("State at least one project boundary.");
+        var deadline = HasRegex(text, @"\b\d+\s*(?:days?|weeks?|months?)\b") || HasRegex(text, @"\b(?:by|before|until)\s+(?:20\d{2}-\d{2}-\d{2}|\w+\s+\d{1,2}(?:,?\s+20\d{2})?)\b");
+        var tech = HasRegex(text, @"\b(?:react|python|\.net|java|sql)\b") && HasPhrase(text, "must", "use", "only", "required");
+        var access = HasPhrase(text, "read-only", "no production access", "offline");
+        var budget = HasRegex(text, @"(?:\$|€|£)\s*\d+(?:[.,]\d+)?") && HasPhrase(text, "budget", "cap", "maximum");
+        var legal = HasPhrase(text, "nda", "gdpr", "consent", "anonymized") && HasPhrase(text, "must", "required", "only");
+        var categories = Signals((deadline, "constraint.deadline"), (tech, "constraint.technology"), (access, "constraint.access"), (budget, "constraint.budget"), (legal, "constraint.legal"));
+        if (categories.Length >= 2) return Full("Two distinct boundary categories are present.", categories);
+        return Half(categories.Length == 1
+            ? "One boundary is present; the detector needs a second distinct category for full credit."
+            : "Nonempty constraints are present, but no listed boundary category was established.", categories);
+    }
+
+    private static CheckResult Users(TaskFields f)
+    {
+        var text = Normalize(f.Users);
+        if (IsEmpty(text)) return Zero("Name a user group and its role or usage situation.");
+        var group = HasPhrase(text, "dispatchers", "customers", "students", "teachers", "analysts", "managers", "operators", "support agents");
+        var usage = HasPhrase(text, "use to", "review", "monitor", "enter", "decide", "approve", "receive alerts");
+        var signals = Signals((group, "users.group"), (usage, "users.usage"));
+        if (group && usage) return Full("A user group and its role or usage are present.", signals);
+        var absent = !group ? "a listed user group" : "what that group does with the result";
+        return Half($"Nonempty user details are present, but the detector could not establish {absent}.", signals);
+    }
+
+    private static CheckResult BusinessConnection(TaskFields f)
+    {
+        var contact = Present(f.Contact);
+        var text = Normalize(f.InteractionFormat);
+        var consultation = HasPhrase(text, "call", "meeting", "consultation", "office hours", "weekly sync");
+        var feedback = HasPhrase(text, "feedback", "review", "comments", "approve", "acceptance session");
+        if (!contact && IsEmpty(text)) return Zero("Add a contact and consultation with a feedback procedure.");
+        var signals = Signals((contact, "contact.present"), (consultation, "interaction.consultation"), (feedback, "interaction.feedback"));
+        if (contact && consultation && feedback) return Full("Contact, consultation, and feedback procedure are present.", signals);
+        var absent = !contact ? "a contact" : !consultation ? "a consultation format" : "a feedback procedure";
+        return Half($"Some business connection details are present, but the detector could not establish {absent}.", signals);
+    }
+
+    private static bool Present(string? value) => !IsEmpty(value);
+
+    private static bool IsEmpty(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return true;
+        return value.EnumerateRunes().Count(rune => !Rune.IsWhiteSpace(rune)) < 3;
+    }
+
+    private static string Normalize(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        var normalized = value.Normalize(NormalizationForm.FormKC).ToLowerInvariant();
+        return Regex.Replace(normalized, @"\s+", " ", RegexOptions.CultureInvariant).Trim();
+    }
+
+    private static bool HasPhrase(string text, params string[] phrases) => phrases.Any(phrase =>
+        HasRegex(text, $@"\b{Regex.Escape(phrase)}(?:s|es)?\b"));
+
+    private static bool HasRegex(string text, string pattern) =>
+        Regex.IsMatch(text, pattern, RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
+    private static string[] Signals(params (bool Match, string Id)[] signals) =>
+        signals.Where(signal => signal.Match).Select(signal => signal.Id).ToArray();
+
+    private static CheckResult Zero(string reason) => new(0, reason, []);
+    private static CheckResult Half(string reason, params string[] signals) => new(-2, reason, signals);
+    private static CheckResult Full(string reason, params string[] signals) => new(-1, reason, signals);
+
+    private static string MakeCacheKey(TaskFields fields)
+    {
+        var canonical = string.Join("\n", RulesVersion,
+            Normalize(fields.Title), Normalize(fields.Context), Normalize(fields.Need), Normalize(fields.Users),
+            Normalize(fields.Data), Normalize(fields.Constraints), Normalize(fields.ExpectedResult),
+            Normalize(fields.SuccessCriteria), Normalize(fields.Contact), Normalize(fields.InteractionFormat),
+            string.Join("\u001f", fields.Topics.Select(Normalize)),
+            string.Join("\u001f", fields.TechTags.Select(Normalize)));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
+    }
+
+    private sealed record CriterionRule(string Key, int Weight, string[] Fields, Func<TaskFields, CheckResult> Check);
+    private sealed record CheckResult(int Score, string Reason, string[] Signals);
 }
