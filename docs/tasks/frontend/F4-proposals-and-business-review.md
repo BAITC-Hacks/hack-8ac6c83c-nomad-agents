@@ -13,6 +13,7 @@ P0 covers team proposal submission and business comparison/manual decision. Deci
 - `web/src/pages/team/MyProposals.tsx` (route `/team/proposals`) — P0 list with status badges, using `GET /proposals/mine`; P2 adds milestone history.
 
 ## Depends on
+- F0 actor context/client and B6 proposal/decision API. P1 Reset and P2 milestones depend on B10; reuse the same stable milestone ID/idempotency key on retries and double clicks.
 - F2 must own the Task Detail tab shell before this task adds the Proposals tab to it — coordinate or stub the shell first.
 - F3's `TaskView` page must exist as the mount point for `ProposalForm`.
 

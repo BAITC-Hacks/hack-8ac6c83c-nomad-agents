@@ -13,7 +13,7 @@ The shared, reusable RatingPanel component (used by the wizard, task detail, and
 - `web/src/pages/business/TaskDetail.tsx` (route `/business/tasks/:id`) — P0 tabs: confirmed **Card**, full **Rating** with breakdown, and a **Proposals** tab provided by F4. P1 adds inline post-publish edits, Confirm & re-score, "Unconfirmed changes — catalog shows last confirmed version" banner, and before/after history. P2 adds the history sparkline.
 
 ## Depends on
-None structurally, but F1 and F4 both consume `RatingPanel`/`LevelBadge` — build these first or coordinate interfaces early.
+- B3's rating DTO and B4's confirmed task/delta contract; F0 actor context/client. The display component can be developed against agreed DTOs before endpoints are live. F1 and F4 consume it — coordinate props early. P1 edits/preview depend on B10; GET preview needs the latest editable fields saved with PUT /fields first.
 
 ## Acceptance checks (manual — S4, S5; P1: S12)
 - Progress bar markers align to 40/70/90 regardless of score.

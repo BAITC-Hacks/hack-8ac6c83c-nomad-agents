@@ -1,5 +1,7 @@
 # Backend task queue — MVP priorities
 
+See the [cross-source audit and ownership map](../README.md), [I0 full-stack delivery](../tasks/I0-integration-and-delivery.md), and [B10 optional backend slices](B10-optional-features.md). B0 freezes interfaces before B1, but its working repository-backed actor guard is completed and checked after B1/B7. B2 stub and B3 pure rules can start from those interfaces; their persistence checks wait for B1. B7 fixtures should be prepared early, not after B6.
+
 Source of truth: [MVP_SPEC.md](../../MVP_SPEC.md), especially §§2–3, 4–7 and 15. These briefs target the current `api/` scaffold. The scaffold has a .NET project and OpenAPI registration, but its runnable host, Swagger UI, and feature behavior still need verification. **Start with B00, then finish the entire P0 journey before P1 or P2.** Work through the dependencies below. Do not edit frontend files. The product has one AI `analyze` call; the backend owns scoring, levels, quests, and catalog position.
 
 | Priority | Brief | Result | Depends on |
@@ -15,6 +17,8 @@ Source of truth: [MVP_SPEC.md](../../MVP_SPEC.md), especially §§2–3, 4–7 a
 | P0 | [B7](B7-demo-seed-and-admin.md) | `demo` and `full` fixtures, guarded seed | B1, B3 |
 | P0 | [B8](B8-integration-and-contract.md) | End-to-end API and OpenAPI handoff | B2–B7 |
 | P2 | [B9](B9-optional-backend-deployment.md) | Optional Cloud Run deployment | B8 |
+| P1/P2 | [B10](B10-optional-features.md) | Explicit owners for recommendations, preview, Reset, logs, milestones and leaderboard | B8; per-slice dependencies in brief |
+| P0 | [I0](../tasks/I0-integration-and-delivery.md) | Client generation, running UI integration, README, two rehearsals | B8, F0–F4 for final gate |
 
 P0 API surface: `/api/health`, `/api/actors`, task create/read/mine/analyze/answers/fields/confirm/publish, `/api/catalog` with topic and level filters, `/api/catalog/topics`, task proposal upsert/list, team proposal list, proposal decision (`selected|rejected`), and guarded `/api/admin/seed?profile=demo|full`. Preserve the route and response shapes in spec §7. The wizard shows the last confirmed score while editing; `/rating-preview` is P1. Remove unfinished optional routes from the mapped API or make them explicitly unavailable; never return fake success data.
 

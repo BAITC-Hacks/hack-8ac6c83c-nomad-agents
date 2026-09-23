@@ -1,5 +1,7 @@
 # TaskForge MVP Project Scaffolding
 
+> Historical scaffold plan, not the current feature queue. Its A/B brief names and completion checklist do not establish implementation status. Use the [reviewed task map](../../README.md), [backend queue](../../backend/README.md), and [frontend queue](../../tasks/frontend/README.md) for current work; MVP_SPEC.md in the repository root remains the build specification.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Scaffold the complete directory structure, configuration files, and skeleton code for TaskForge MVP to enable parallel development across backend (.NET), frontend (React), and documentation.

@@ -11,7 +11,7 @@ Provides a viewer for the prompt, input/output format, and invalid handling. P0 
 - `web/src/pages/AiLogs.tsx` (route `/ai-logs`) — table: time, kind, task, model, validation result, latency, from `GET /ai-logs?taskId=`; expandable row reveals system prompt, input JSON, raw output.
 
 ## Depends on
-None.
+- B2's persisted attempt/fallback logs, B10's P1 log read endpoint and generated contract, and F0's actor context/navigation. I0 owns client generation. Do not treat an empty placeholder endpoint as a working viewer.
 
 ## Acceptance checks (manual — S13, S14)
 - A successful analyze call and a forced-invalid-then-retry-then-stub call both appear with correct `validation` values (`ok` / `retry-ok` / `fallback-stub`) and visible errors array.

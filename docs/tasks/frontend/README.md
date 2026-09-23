@@ -1,5 +1,7 @@
 # Frontend task queue — MVP priorities
 
+See the [cross-source audit](../../README.md). [I0](../I0-integration-and-delivery.md) owns client generation and final UI/API delivery. [B10](../../backend/B10-optional-features.md) supplies optional API features required by F3/F4/F5/F6; optional UI must wait for its corresponding working backend slice.
+
 Source of truth: [MVP_SPEC.md](../../../MVP_SPEC.md), especially §§2, 8, 14–15. **P0 is the top priority and the demo gate.** Complete its full journey before P1 or P2.
 
 | Priority | Brief | P0 result |

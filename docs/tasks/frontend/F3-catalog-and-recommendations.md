@@ -13,6 +13,7 @@ The shared catalog list and team-facing read-only task view are P0. Add the reco
 - `web/src/pages/team/TaskView.tsx` (route `/catalog/:id`) — read-only confirmed card with expected result/success criteria/constraints prominent; compact RatingPanel; existing proposal status shown and edits locked after a decision (proposal form itself lives in F4).
 
 ## Depends on
+- F0 actor context/client, B4 task/mine reads and B5 catalog. Recommendations depend on B10's P1 slice.
 - F2's `RatingPanel` (`compact` variant) and `LevelBadge`.
 - P1 recommendations never filter the P0 catalog — the full catalog always renders below the strip regardless of matches.
 

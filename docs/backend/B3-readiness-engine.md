@@ -17,14 +17,16 @@ Normalize Unicode whitespace/case; fewer than three non-space characters counts 
 | Criterion | 0 | Half | Full evidence (all stated signals required) |
 |---|---|---|---|
 | Context + need / 20 | Both empty | One field present | Both `context` and `need` present |
-| Data / 20 | Empty | Nonempty | Named source/example (`logs`, `database`, `files`, `API`, `export`, etc.) **and** format/quantity/access marker (`CSV`, `PDF`, count + unit, URL, read-only access, etc.) |
+| Data / 20 | Empty | Nonempty | `data.source` AND at least one of `data.format`, `data.quantity`, `data.access`, using the exact vocabulary/patterns in spec §5.3. `export` alone is an access signal, not a source; a bare URL is not an additional specified detector. |
 | Expected result / 15 | Empty | Nonempty | Deliverable term (`dashboard`, `report`, `model`, `prototype`, `API`, `app`, etc.) **and** function/action (`predict`, `classify`, `show`, `generate`, `track`, etc.) |
 | Success criteria / 15 | Empty | Nonempty | Outcome/measure term **and** numeric target with unit/comparison or explicit pass/fail acceptance condition; a bare number is insufficient |
 | Constraints / 10 | Empty | One recognized boundary | Two distinct categories among time, technology, access, legal, budget; e.g. `6 weeks` plus `read-only` |
-| Users / 10 | Empty | User group named | Group plus count, role, or usage situation; e.g. `12 dispatchers` |
+| Users / 10 | Empty | User group named | `users.group` AND `users.usage`: group plus role/action or usage situation. `12 dispatchers` alone earns 5, not 10; `12 dispatchers monitor delays` supplies both signals. |
 | Business connection / 10 | Both empty | Contact or interaction present | Contact plus consultation channel/cadence **and** feedback procedure |
 
 Map each missing signal to a plain-language `reason` and quest. Return seven ordered breakdown rows, `total`, level (0–39 draft, 40–69 workable, 70–89 ready, 90–100 priority), next threshold, and quests ordered by `potentialPoints = weight - score`. Quest points are ceilings, not guarantees. Cache by canonical confirmed fields plus `ratingRulesVersion = en-mvp-1`; identical inputs yield identical results in live and stub AI modes. A repeated confirmation may reuse the result without another history entry. The P0 wizard must support a second confirm and show actual score/level delta; a level-up notice appears only when a threshold is crossed.
+
+The table above summarizes the rubric; spec §5.3 owns the exact detector vocabulary (including result actions), independent signal requirements, and conservative fallback. Do not broaden `en-mvp-1` from illustrative examples. Return `missingDetails` as well as quests and explain the English-only evidence limitation for unsupported language (S18).
 
 ## Acceptance
 

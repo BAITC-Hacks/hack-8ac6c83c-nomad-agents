@@ -17,6 +17,7 @@ The business-side draft → analyze → clarify → card → confirm → publish
 - `web/src/components/wizard/PublishedStep.tsx` — confirmation message, catalog position, link to task detail
 
 ## Depends on
+- F0 actor context/client, B2 analysis and B4 lifecycle endpoints; B7 provides actors for the manual flow. I0 coordinates generated contracts.
 - F2 (RatingPanel component) — reuse it inside CardStep/RatingStep rather than duplicating.
 - Generated client for `/tasks`, `/tasks/{id}/analyze`, `/tasks/{id}/answers`, `/tasks/{id}/fields`, `/tasks/{id}/confirm`, `/tasks/{id}/publish`.
 

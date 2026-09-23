@@ -11,7 +11,7 @@ Simple points leaderboard, lowest priority of the frontend tasks.
 - `web/src/pages/Leaderboard.tsx` (route `/leaderboard`) — table of teams sorted by `points desc`, from `GET /leaderboard`.
 
 ## Depends on
-None.
+- B10's P2 milestone/leaderboard slice and its generated API contract; F0 actor context and F4 milestone action. I0 owns client generation. Do not enable navigation until the real endpoint is available.
 
 ## Acceptance checks (manual)
 - Order matches `points desc` from the API (no client-side re-sort logic needed beyond trusting API order).
