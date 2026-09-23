@@ -1,0 +1,47 @@
+:root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #202a3b; background: #f5f7fb; font-synthesis: none; text-rendering: optimizeLegibility; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, select { font: inherit; }
+.app-frame { min-height: 100vh; }
+.topbar { height: 76px; padding: 0 34px; display: flex; align-items: center; justify-content: space-between; background: #fff; border-bottom: 1px solid #e8ecf3; position: relative; z-index: 2; }
+.brand { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 11px; }
+.brand-mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: #5c59e8; color: #fff; font-size: 21px; font-weight: 800; box-shadow: 0 5px 12px #5c59e833; }
+.brand strong, .brand small { display: block; }
+.brand strong { font-size: 18px; font-weight: 800; letter-spacing: -.4px; }
+.brand small { color: #81899a; font-size: 11px; margin-top: 2px; }
+.topbar-right { display: flex; align-items: center; }
+.actor-control { display: flex; align-items: center; gap: 10px; }
+.actor-control label { color: #70798b; font-size: 12px; font-weight: 600; }
+.actor-control select { min-width: 196px; border: 1px solid #dfe4ed; border-radius: 9px; background: #fff; padding: 10px 34px 10px 12px; color: #30394b; font-size: 13px; outline: none; }
+.actor-control select:focus { border-color: #716eed; box-shadow: 0 0 0 3px #716eed20; }
+.actor-error { color: #a56c18; font-size: 11px; }
+.workspace { display: flex; min-height: calc(100vh - 76px); }
+.sidebar { position: relative; width: 232px; flex: 0 0 232px; padding: 32px 17px 24px; border-right: 1px solid #e8ecf3; background: #fff; }
+.nav-caption { margin: 1px 10px 13px; color: #9aa2b1; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; }
+.sidebar nav { display: grid; gap: 5px; }
+.nav-link { padding: 11px 12px; border-radius: 8px; color: #667084; text-decoration: none; font-size: 13px; font-weight: 600; }
+.nav-link:hover { background: #f5f6fc; color: #514ee0; }
+.nav-link.active { color: #514ee0; background: #f0f0ff; }
+.sidebar-bottom { position: absolute; bottom: 24px; left: 28px; display: flex; align-items: center; gap: 8px; color: #8b93a2; font-size: 11px; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #55bd8a; box-shadow: 0 0 0 3px #55bd8a1c; }
+.main-content { flex: 1; padding: clamp(26px, 5vw, 64px); }
+.welcome-card, .page-card { max-width: 760px; margin: 12px auto; padding: clamp(28px, 5vw, 52px); border: 1px solid #e9edf5; border-radius: 15px; background: #fff; box-shadow: 0 12px 35px #25385a08; }
+.eyebrow { color: #6562e7; font-size: 10px; letter-spacing: 1.2px; font-weight: 700; }
+.welcome-card h1, .page-card h1 { margin: 14px 0 9px; color: #202a3b; font-size: clamp(25px, 4vw, 32px); font-weight: 800; letter-spacing: -1px; }
+.welcome-card p, .page-card p { margin: 0; color: #737d8f; font-size: 14px; line-height: 1.6; }
+.integration-note { margin-top: 34px; padding: 15px 17px; border: 1px dashed #d9deea; border-radius: 9px; color: #7c8493; background: #fafbfe; font-size: 12px; }
+.toast { position: fixed; z-index: 5; right: 24px; bottom: 24px; display: flex; align-items: flex-start; gap: 12px; width: min(390px, calc(100vw - 32px)); padding: 16px; border: 1px solid #f0d3d1; border-radius: 11px; background: #fff; box-shadow: 0 12px 40px #27334c21; }
+.toast-icon { display: grid; place-items: center; flex: 0 0 22px; height: 22px; border-radius: 50%; background: #fff0ef; color: #bf4b45; font-weight: 700; }
+.toast strong, .toast small { display: block; }
+.toast strong { color: #263044; font-size: 13px; }
+.toast small { margin-top: 5px; color: #727c8d; font-size: 12px; line-height: 1.45; }
+.toast button { margin: -4px -4px 0 auto; border: 0; background: transparent; color: #81899a; font-size: 21px; cursor: pointer; }
+@media (max-width: 680px) {
+  .topbar { height: auto; min-height: 72px; padding: 14px 18px; align-items: flex-start; gap: 14px; flex-direction: column; }
+  .actor-control { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .actor-control select { width: min(330px, calc(100vw - 36px)); }
+  .workspace { min-height: calc(100vh - 130px); }
+  .sidebar { width: 150px; flex-basis: 150px; padding: 24px 10px; }
+  .main-content { padding: 22px 14px; }
+  .sidebar-bottom { left: 17px; }
+}
