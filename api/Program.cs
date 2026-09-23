@@ -1,6 +1,7 @@
 using TaskForge.Api.Features.Actors;
 using TaskForge.Api.Features.Health;
 using TaskForge.Api.Features.Ai;
+using TaskForge.Api.Features.Rating;
 using TaskForge.Api.Infrastructure.OpenAi;
 using TaskForge.Api.Infrastructure.InMemory;
 
@@ -26,6 +27,8 @@ builder.Services.AddSingleton<IStoreAdminRepository, StoreAdminRepository>();
 builder.Services.AddSingleton<ActorGuard>();
 builder.Services.AddHttpClient<ResponsesClient>(client => client.Timeout = TimeSpan.FromSeconds(20));
 builder.Services.AddTransient<AnalysisService>();
+builder.Services.AddSingleton<IRatingCacheRepository, RatingCacheRepository>();
+builder.Services.AddTransient<RatingService>();
 
 var app = builder.Build();
 
