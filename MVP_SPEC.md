@@ -1,14 +1,16 @@
 # TaskForge — MVP Specification
-**Business Task Quality Rating & Open Team Selection**
+**AI Challenge Coach: Business Task Readiness & Open Team Selection**
 4-hour hackathon build · 2 developers · .NET 10 + React + Firestore + OpenAI
 
 ---
 
 ## 0. TL;DR
 
-A business rep types a weak task description → AI asks clarifying questions (with ≤4 answer chips each) and suggests actionable improvements → rep edits and confirms a structured card → AI scores it 0–100 against a fixed 7-criterion rubric → task is published to a shared catalog sorted by rating → any student team proposes → the business manually selects/rejects → confirmed milestones give the team points.
+A business rep types a weak task description → AI Challenge Coach identifies gaps, asks clarifying questions (with ≤4 answer chips each), and suggests improvements → rep edits and confirms a structured card → the backend computes a transparent 0–100 readiness score and actionable improvement quests → task is published to a shared catalog sorted by rating → any student team proposes → the business manually selects/rejects → confirmed milestones give the team points.
 
-**One AI function family, two calls:** `analyze` (gaps + questions + chips + suggestions) and `score` (rubric scoring). Everything else is deterministic.
+**One required AI call:** `analyze` (gaps + questions + chips + suggestions). The backend owns scoring, levels, quests, and catalog position. AI wording is advice; it never awards points or selects a team.
+
+The product gamifies the quality of the business problem statement. Each editing view answers: **Where am I now? What is missing? What should I add next?** The live demo shows a confirmed before/after score, a level change when a threshold is crossed, and the resulting catalog position.
 
 ### Decisions log (from Q&A)
 
@@ -19,7 +21,7 @@ A business rep types a weak task description → AI asks clarifying questions (w
 | 3 | OpenAI style | Responses API + strict JSON schema |
 | 4 | Model | Mini-tier model, name in env var |
 | 5 | AI scope | SoW minimum: completeness analysis + clarifying questions |
-| 6 | Rating | AI-scored per criterion, backend-guarded (clamp, empty=0, hash cache) |
+| 6 | Rating | Backend-owned, deterministic rubric; AI feedback cannot change points |
 | 7 | Identity | Role switcher, no login |
 | 8 | Data access | Frontend → .NET API only; Firestore closed to clients |
 | 9 | Local DB | Firestore emulator in compose |
@@ -31,7 +33,7 @@ A business rep types a weak task description → AI asks clarifying questions (w
 | 15 | Draft → card | AI asks questions + suggests actionable items; only user-written text is pre-filled |
 | 16 | Answer UI | Up to 4 AI chips per question (select) **or** free text |
 | 17 | Post-publish edit | Allowed; stays visible; re-scored on confirm (per SoW §4) |
-| 18 | Sort | Rating desc, then `updatedAt` desc |
+| 18 | Sort | Rating desc, then confirmedAt desc, then task ID |
 | 19 | Filters | Topic + readiness level (level is SoW-mandatory) |
 | 20 | Recommendations | Rule-based: team interest/tech tags ∩ task tags |
 | 21 | Proposal fields | Idea, plan, timeline, prototype link |
@@ -51,7 +53,7 @@ A business rep types a weak task description → AI asks clarifying questions (w
 
 | # | Risk | Mitigation in this spec |
 |---|---|---|
-| R1 | **AI-scored rating vs. "transparent" (25 pts criterion).** LLM scores drift between identical inputs. | Per-criterion score + reason + missing details from AI; backend clamps to weight; empty fields forced to 0; versioned canonical-input cache → same inputs/model/rubric reuse the same score; rubric anchors in prompt. |
+| R1 | **Rating must be explainable and stable (25 pts criterion).** | The backend applies versioned, field-specific 0/half/full rules to confirmed fields; AI cannot supply points or levels. Identical confirmed input and rubric version produce the same breakdown, quests, and total. |
 | R2 | **"AI must not add facts."** Chips and extraction can smuggle invented facts. | Chips are options only and require user selection. Extraction is restricted to verbatim spans from the draft; backend verifies value/evidence correspondence and that evidence occurs in the raw draft. AI-generated titles require human review. |
 | R3 | **"Draft" naming collision.** Readiness level "Draft" (0–39) ≠ unpublished task. | Use `status: editing \| published` and `level: draft \| workable \| ready \| priority`. UI label for level draft: "Needs clarification". |
 | R4 | **Seed below SoW §6 minimum** (5 of each). | `full` contains at least 5 persisted drafts, complete cards, teams, and proposals immediately after seed; it never counts live wizard activity. |
@@ -68,7 +70,8 @@ A business rep types a weak task description → AI asks clarifying questions (w
 
 ### In scope (MVP)
 - Role switcher (3 businesses, N teams)
-- Task wizard: draft → AI analyze → answer questions → editable card → confirm → rating → publish
+- Task wizard: draft → AI analyze → answer questions → editable card → confirm → deterministic rating → publish
+- AI Challenge Coach panel: current score/progress, level, next threshold, improvement quests with point ceilings and direct links to fields, confirmed before/after comparison and level-up event
 - Rating panel: score, level, breakdown, missing details, delta vs. previous, next-level hint
 - Shared catalog: all published tasks, sort by rating, filters topic + level, priority highlighted, catalog position `#n of m`
 - Recommendations strip for teams (rule-based on interests, skills, and technology tags; no sensitive participant attributes)
@@ -123,8 +126,8 @@ Local: docker compose → web (vite) + api + firestore-emulator
 │  └─ Features/
 │     ├─ Actors/              # businesses, teams, role list
 │     ├─ Tasks/               # create draft, answers, card edit, confirm, publish
-│     ├─ Ai/                  # analyze, score, stub, validator, ai-logs
-│     ├─ Rating/              # guard, levels, cache, history
+│     ├─ Ai/                  # analyze, stub, validator, ai-logs
+│     ├─ Rating/              # deterministic rules, quests, levels, cache, history
 │     ├─ Catalog/             # list, filters, position, recommendations
 │     ├─ Proposals/           # upsert, list, decision, milestones
 │     └─ Admin/               # seed, reset, health
@@ -190,6 +193,8 @@ Local: docker compose → web (vite) + api + firestore-emulator
 | 70–89 | `ready` | Ready | Visible, green badge, higher position (by sort) |
 | 90–100 | `priority` | Priority | Visible, gold badge + highlighted card border + ★ |
 
+The AI Challenge Coach reference calls 40–69 “Working”; this MVP uses “Workable” because that is the label in `TECHTASK.pdf`. The score boundaries are identical.
+
 ### 4.4 Firestore collections
 
 ```
@@ -220,10 +225,11 @@ tasks/{taskId}
   hasUnconfirmedChanges: bool
   rating: {
     total: int, level: string,
-    breakdown: [{ criterion, weight, score, reason }],
+    breakdown: [{ criterion, weight, score, reason, matchedSignals: string[] }],
     missingDetails: [{ criterion, detail }],
-    source: "ai" | "stub" | "seed" | "cache",
-    cacheKey: string, scoredAt
+    quests: [{ criterion, fieldKey, action, potentialPoints }],
+    source: "rules" | "seed" | "cache",
+    ratingRulesVersion: string, cacheKey: string, scoredAt
   } | null
   ratingHistory: [{ total, level, scoredAt }]   # last 10, for delta display
   proposalCount: int
@@ -239,7 +245,7 @@ proposals/{proposalId}          # id = `${taskId}_${teamId}` → enforces 1 per 
   createdAt, updatedAt
 
 aiLogs/{logId}
-  kind: "analyze" | "score", taskId, model,
+  kind: "analyze", taskId, model,
   systemPrompt, input (json string), rawOutput, validation: "ok" | "retry-ok" | "fallback-stub",
   errors: string[], latencyMs, createdAt
 ```
@@ -373,77 +379,27 @@ Return JSON matching the schema only.
 - `title` > 120 chars → truncate
 - Assign `questions[i].id = "q{i+1}"`
 
-### 5.3 Call 2 — `score` (rubric scoring)
+### 5.3 Backend readiness engine (no LLM score)
 
-**Input**
-```json
-{
-  "rubric": [
-    { "criterion": "contextAndNeed", "weight": 20, "fields": ["context","need"],
-      "full": "Current situation and required change are both clear and specific",
-      "half": "One is clear, the other vague", "zero": "Missing" },
-    { "criterion": "dataAndMaterials", "weight": 20, "fields": ["data"],
-      "full": "Concrete datasets/examples/sources with format, volume or access path",
-      "half": "Data mentioned generally", "zero": "Missing" },
-    { "criterion": "expectedResult", "weight": 15, "fields": ["expectedResult"],
-      "full": "Concrete deliverable (what artifact, what it does)", "half": "Vague goal", "zero": "Missing" },
-    { "criterion": "successCriteria", "weight": 15, "fields": ["successCriteria"],
-      "full": "Measurable signs (numbers, thresholds, acceptance check)", "half": "Qualitative only", "zero": "Missing" },
-    { "criterion": "constraints", "weight": 10, "fields": ["constraints"],
-      "full": "Deadline + tech or access boundaries", "half": "One kind of boundary", "zero": "Missing" },
-    { "criterion": "users", "weight": 10, "fields": ["users"],
-      "full": "Specific user group and their situation", "half": "Generic users", "zero": "Missing" },
-    { "criterion": "businessConnection", "weight": 10, "fields": ["contact","interactionFormat"],
-      "full": "Contact + consultation format + feedback procedure", "half": "Contact only or format only", "zero": "Missing" }
-  ],
-  "card": { "context": "...", "need": "...", "...": "..." }
-}
-```
+The `RatingService` calculates the seven criterion scores from **confirmed fields**. Each criterion receives `0`, `floor(weight / 2)`, or its full weight. The total is their sum; level thresholds remain in §4.3. A nonempty field alone earns at most half credit. Full credit requires the field-specific evidence shown below. The implementation must keep these checks in a versioned, inspectable ruleset and return the rule that fired in each breakdown reason. Text length or an isolated digit never qualifies for full credit.
 
-**System prompt**
-```
-You score how ready a business task card is for a student team, using ONLY the rubric.
-For each criterion give an integer score from 0 to weight, using the anchors
-(full = weight, half ≈ weight/2, zero = 0; intermediate values allowed).
-Judge only what is written in the listed fields. Do not reward length alone.
-"reason": one sentence explaining the score, citing what is present or missing.
-"missingDetails": 0-3 concrete things the business could add to raise this criterion; empty if full.
-Do not invent facts about the business. Same language as the card.
-Return JSON matching the schema only.
-```
+| Criterion | Half-credit condition | Full-credit evidence check | Quest when not full |
+|---|---|---|---|
+| `contextAndNeed` (20) | Exactly one of `context`, `need` has content | Both have content | Describe the missing current situation or required change |
+| `dataAndMaterials` (20) | `data` has nonempty content | Source/example plus a concrete format, quantity, or access detail | Name an available source and how the team can inspect it |
+| `expectedResult` (15) | `expectedResult` has nonempty content | A deliverable/artifact and what it must do | Name the deliverable and its function |
+| `successCriteria` (15) | `successCriteria` has nonempty content | An outcome plus a measurable target or explicit acceptance check | Define a measure and acceptance threshold |
+| `constraints` (10) | One boundary is stated | Two distinct boundaries, such as deadline plus technology or access | Add another deadline, technology, access, legal, or budget boundary |
+| `users` (10) | A user group is named | User group plus its role or usage situation | Explain what that group does with the result |
+| `businessConnection` (10) | Contact or interaction format is present | Contact plus consultation format and feedback procedure | Add the missing contact, consultation, or feedback detail |
 
-**Output schema**
-```json
-{
-  "type": "object", "additionalProperties": false,
-  "required": ["criteria"],
-  "properties": {
-    "criteria": {
-      "type": "array",
-      "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["criterion", "score", "reason", "missingDetails"],
-        "properties": {
-          "criterion": { "type": "string", "enum": ["contextAndNeed","dataAndMaterials","expectedResult","successCriteria","constraints","users","businessConnection"] },
-          "score": { "type": "integer" },
-          "reason": { "type": "string" },
-          "missingDetails": { "type": "array", "items": { "type": "string" } }
-        }
-      }
-    }
-  }
-}
-```
+The engine implements the evidence checks with explicit field-specific detectors and recorded `matchedSignals`; it must not use a generic character-count threshold. Normalize whitespace and case before checking. If a check is ambiguous or unsupported for the input language, use half credit and explain the missing evidence. Keep the original text visible for human review. No AI response may directly modify `score`, `level`, or `matchedSignals`.
 
-**Backend guard (`RatingGuard`) — authoritative**
-1. Exactly the 7 criteria, no duplicates → else invalid.
-2. `score = clamp(score, 0, weight)`.
-3. Apply empty rules from §4.2 (empty → 0; partial caps 10 / 5). Replace reason with "Field is empty" when forced.
-4. `total = Σ score`; `level` from §4.3.
-5. Cache key: SHA-256 of canonical normalized confirmed fields + rubric version + scoring mode/model version. Persist/reuse ratings by key so returning to an earlier revision reuses its result. Never reuse a `stub` result as an `ai` result; allow explicit rescore when live mode returns. Store cache key and source with each rating.
-6. Append to `ratingHistory` (keep last 10).
+For each criterion return `{ criterion, weight, score, reason, matchedSignals }` and up to three `missingDetails`. A quest is generated from the highest-value missing condition with `potentialPoints = weight - score`, a short action, and `fieldKey` for the **Add details** button. `potentialPoints` is a ceiling if the missing evidence is supplied, not a promised score increase. Sort quests by potential points descending. The next-level hint uses `threshold - total`, never a sum of potential points.
 
-### 5.4 Failure handling (both calls)
+Use `ratingRulesVersion` in the cache key: SHA-256 of canonical normalized confirmed fields plus ruleset version. Identical confirmed fields under the same ruleset yield the same score regardless of AI availability or model. Append confirmed results to `ratingHistory` (last 10); compute delta against the preceding confirmed result. A repeated confirm with no edits returns the cached result and adds no history entry.
+
+### 5.4 Failure handling (analyze call)
 
 ```
 call OpenAI ──► HTTP/timeout error ──┐
@@ -457,7 +413,7 @@ parse + validate ──invalid──► retry once (same input, append "Previous
 
 **Stubs (deterministic)**
 - `AnalyzeStub`: ask about missing or weak fields in priority order, up to 5 and never fewer than 3. If fewer than 3 gaps exist, ask relevant specificity/confirmation questions about the weakest populated fields. Chips `[]`; suggestions = "Add {label}" for each gap; extracted `[]`.
-- `ScoreStub`: deterministic criterion-specific checks against rubric anchors (missing = 0; vague/general = at most half weight; concrete evidence for each rubric element = full weight). Do not award points for text length or digits alone. Return reasons and missing details from failed anchors, mark source `stub`, and show the basic-mode notice. Its result is illustrative and must not be described as AI scoring.
+- The readiness engine in §5.3 runs unchanged when AI is unavailable. The user can continue editing and confirming the card; only AI questions, chips, and wording suggestions switch to basic mode.
 
 | fieldKey | Stub question |
 |---|---|
@@ -471,7 +427,7 @@ parse + validate ──invalid──► retry once (same input, append "Previous
 | interactionFormat | How and how often can the team consult with you and get feedback? |
 | contact | Who is the contact person and how to reach them? |
 
-Every call (success, retry, stub) writes an `aiLogs` document. `AI_MODE=stub` env skips OpenAI entirely.
+Every analyze attempt (success, retry, or stub fallback) writes an `aiLogs` document. `AI_MODE=stub` skips OpenAI entirely, while rating remains deterministic.
 
 ---
 
@@ -486,13 +442,14 @@ Every call (success, retry, stub) writes an `aiLogs` document. `AI_MODE=stub` en
 published ──edit──► hasUnconfirmedChanges=true (catalog still shows LAST CONFIRMED card + rating)
           ──confirm──► re-scored, catalog updates position
 ```
-- Points are awarded only for confirmed fields (SoW §4): rating is computed only on `confirm`, from the `confirmed` snapshot.
+- Points are awarded only for confirmed fields (SoW §4): the authoritative rating is committed only on `confirm`, from that revision's confirmed snapshot.
+- While editing, the Coach may request a deterministic preview from the unsaved fields. Label it **Preview — confirm to update your rating**; previews are never written to `ratingHistory`, used for catalog sorting, or treated as awarded points.
 - Catalog always displays `confirmed.fields` + `rating`, never unconfirmed edits.
 - Publishing is allowed at any score (low rating doesn't hide the task — SoW §4).
 - Publish requires: `title` non-empty, `rating != null`, no unconfirmed changes.
 
 ### 6.2 Answers → card merge
-`PUT /answers` with `[{ questionId, fieldKey, text }]` is idempotent by `questionId`: repeat submissions replace that answer's previous contribution rather than appending duplicates. Recompute the field from its original user value and current answers.
+`PUT /answers` with `[{ questionId, fieldKey, text }]` is idempotent by `questionId`: repeat submissions replace that answer's previous contribution rather than appending duplicates. Recompute the field from its original user value and current answers. This is the task-structuring step: user answers map to the question's known `fieldKey`, and the business can edit every resulting field before confirmation.
 - field empty → set to `text`
 - field non-empty → append `"\n" + text`
 - provenance: `chip` if text equals a chip exactly, else `user`
@@ -543,6 +500,7 @@ All routes under `/api`. JSON. Errors = RFC 7807 `ProblemDetails` with `errors` 
 | POST | `/tasks/{id}/analyze` | business owner | → `AnalysisDto` |
 | PUT | `/tasks/{id}/answers` | business owner | `{ answers:[{questionId, fieldKey, text}] }` → `TaskDto` |
 | PUT | `/tasks/{id}/fields` | business owner | `{ fields:{...partial} }` → `TaskDto` |
+| GET | `/tasks/{id}/rating-preview` | business owner | deterministic preview from current editable fields; no persistence or catalog effect |
 | POST | `/tasks/{id}/confirm` | business owner | → `{ task: TaskDto, rating: RatingDto, delta: int, position }` |
 | POST | `/tasks/{id}/publish` | business owner | → `TaskDto` |
 | GET | `/catalog?topic=&level=` | any | `CatalogItemDto[]` (position, level, rating, topics, proposalCount) |
@@ -561,9 +519,10 @@ All routes under `/api`. JSON. Errors = RFC 7807 `ProblemDetails` with `errors` 
 **DTO sketches**
 ```ts
 RatingDto { total:number; level:'draft'|'workable'|'ready'|'priority';
-  breakdown:{criterion:string; weight:number; score:number; reason:string}[];
+  breakdown:{criterion:string; weight:number; score:number; reason:string; matchedSignals:string[]}[];
   missingDetails:{criterion:string; detail:string}[];
-  source:'ai'|'stub'|'seed'|'cache'; scoredAt:string;
+  quests:{criterion:string; fieldKey:string; action:string; potentialPoints:number}[];
+  source:'rules'|'seed'|'cache'; ratingRulesVersion:string; scoredAt:string;
   nextLevel?:{ level:string; pointsNeeded:number } }
 
 AnalysisDto { title:string;
