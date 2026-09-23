@@ -1,4 +1,5 @@
 # Secrets & local environment
+api/.vs
 .env
 .env.local
 *.local

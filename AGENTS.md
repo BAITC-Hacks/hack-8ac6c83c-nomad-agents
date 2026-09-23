@@ -3,7 +3,7 @@
 Spec: docs/MVP_SPEC.md (source of truth). Briefs: docs/tasks/*.md.
 
 ## Stack
-.NET 10 Minimal API (api/), React+Vite+TS+Tailwind+shadcn (web/), Firestore (emulator locally), OpenAI Responses API.
+.NET 9 Minimal API (api/), React+Vite+TS+Tailwind+shadcn (web/), Firestore (emulator locally), OpenAI Responses API.
 
 ## Rules
 - Contract-first: change API → regenerate client (scripts/gen-client.sh). Never edit web/src/api/.

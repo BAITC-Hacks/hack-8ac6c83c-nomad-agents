@@ -3,7 +3,7 @@ Hackathon team repository for Nomad Agents
 
 ## API baseline (B00)
 
-Requires the .NET 10 SDK for a host run, or Docker with Compose for a container run.
+Requires the .NET 9 SDK for a host run, or Docker with Compose for a container run.
 From the repository root:
 
 ```sh

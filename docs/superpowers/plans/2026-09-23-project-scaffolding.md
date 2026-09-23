@@ -7,13 +7,13 @@
 **Goal:** Scaffold the complete directory structure, configuration files, and skeleton code for TaskForge MVP to enable parallel development across backend (.NET), frontend (React), and documentation.
 
 **Architecture:** 
-- Backend: .NET 10 Minimal API with Firestore integration, deployed to Cloud Run
+- Backend: .NET 9 Minimal API with Firestore integration, deployed to Cloud Run
 - Frontend: React + Vite + TypeScript + Tailwind + shadcn/ui, deployed to Netlify
 - Local Dev: Docker Compose (API, web, Firestore emulator)
 - Agentic Development: Structured agent briefs in `docs/tasks/`, role-based AGENTS.md and CLAUDE.md
 
 **Tech Stack:** 
-.NET 10, React 18, Vite, TypeScript, Tailwind CSS, shadcn/ui, Firestore, OpenAI Responses API, Docker, GCP Cloud Run, Netlify
+.NET 9, React 18, Vite, TypeScript, Tailwind CSS, shadcn/ui, Firestore, OpenAI Responses API, Docker, GCP Cloud Run, Netlify
 
 **Spec:** `docs/MVP_SPEC.md`
 
@@ -57,7 +57,7 @@
 ├─ api/
 │  ├─ .gitkeep                        # Placeholder; delete when first file added
 │  ├─ Dockerfile                      # Multi-stage build (§10.3)
-│  ├─ TaskForge.Api.csproj            # Project file (.NET 10)
+│  ├─ TaskForge.Api.csproj            # Project file (.NET 9)
 │  ├─ Program.cs                      # Minimal API setup, OpenAPI, dependency injection
 │  ├─ Domain/
 │  │  └─ .gitkeep
@@ -207,7 +207,7 @@ VITE_API_BASE_URL=http://localhost:8080
 Spec: docs/MVP_SPEC.md (source of truth). Briefs: docs/tasks/*.md.
 
 ## Stack
-.NET 10 Minimal API (api/), React+Vite+TS+Tailwind+shadcn (web/), Firestore (emulator locally), OpenAI Responses API.
+.NET 9 Minimal API (api/), React+Vite+TS+Tailwind+shadcn (web/), Firestore (emulator locally), OpenAI Responses API.
 
 ## Rules
 - Contract-first: change API → regenerate client (scripts/gen-client.sh). Never edit web/src/api/.
@@ -347,7 +347,7 @@ Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 2: Backend Skeleton (.NET 10 API)
+### Task 2: Backend Skeleton (.NET 9 API)
 
 **Files:**
 - Create: `api/TaskForge.Api.csproj`
@@ -358,7 +358,7 @@ Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>"
 - Create: `api/Infrastructure/OpenAi/.gitkeep`
 
 **Interfaces:**
-- Produces: Buildable .NET 10 project with Minimal API, OpenAPI enabled, all feature folders connected
+- Produces: Buildable .NET 9 project with Minimal API, OpenAPI enabled, all feature folders connected
 
 - [ ] **Step 1: Create `api/TaskForge.Api.csproj`**
 
@@ -366,7 +366,7 @@ Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>"
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
@@ -438,12 +438,12 @@ app.Run();
 - [ ] **Step 3: Create `api/Dockerfile`**
 
 ```dockerfile
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 COPY . .
 RUN dotnet publish -c Release -o /out
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
 COPY --from=build /out .
 COPY seed ./seed
@@ -461,9 +461,9 @@ Expected: No restore errors; project loads
 
 ```bash
 git add api/TaskForge.Api.csproj api/Program.cs api/Dockerfile
-git commit -m "feat: backend skeleton with .NET 10 minimal API
+git commit -m "feat: backend skeleton with .NET 9 minimal API
 
-- TaskForge.Api.csproj: targets net10.0, Firestore + System.Text.Json
+- TaskForge.Api.csproj: targets net9.0, Firestore + System.Text.Json
 - Program.cs: CORS from env, OpenAPI enabled, placeholder routes
 - Dockerfile: multi-stage build, seed/ copied
 

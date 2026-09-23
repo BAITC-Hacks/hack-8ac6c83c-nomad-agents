@@ -1,6 +1,6 @@
 # TaskForge — MVP Specification
 **AI Challenge Coach: Business Task Readiness & Open Team Selection**
-4-hour hackathon build · 2 developers · .NET 10 + React + Firestore + OpenAI
+4-hour hackathon build · 2 developers · .NET 9 + React + Firestore + OpenAI
 
 ---
 
@@ -103,7 +103,7 @@ Auth, passwords, complex roles, chat, notifications, calendar, file upload, ML t
 
 ```
 ┌──────────────┐   HTTPS/JSON   ┌───────────────────────────┐    gRPC    ┌───────────┐
-│ React SPA    │ ─────────────► │ .NET 10 Minimal API        │ ─────────► │ Firestore │
+│ React SPA    │ ─────────────► │ .NET 9 Minimal API        │ ─────────► │ Firestore │
 │ (Netlify)    │  X-Actor-*     │ (Cloud Run)                │            │ (native)  │
 │ TanStack Q.  │                │  Features/ Rating/ Ai/     │ ─────────► │ OpenAI    │
 └──────────────┘                └───────────────────────────┘   HTTPS    │ Responses │
@@ -724,12 +724,12 @@ Firestore client: `new FirestoreDbBuilder { ProjectId = cfg.GCP_PROJECT_ID, Emul
 
 ### 10.3 `api/Dockerfile`
 ```dockerfile
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 COPY . .
 RUN dotnet publish -c Release -o /out
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
 COPY --from=build /out .
 COPY seed ./seed
@@ -811,7 +811,7 @@ orval config: input `./openapi.json`, output `src/api/`, client `react-query`, c
 Spec: MVP_SPEC.md (source of truth). Briefs: docs/tasks/*.md.
 
 ## Stack
-.NET 10 Minimal API (api/), React+Vite+TS+Tailwind+shadcn (web/), Firestore (emulator locally), OpenAI Responses API.
+.NET 9 Minimal API (api/), React+Vite+TS+Tailwind+shadcn (web/), Firestore (emulator locally), OpenAI Responses API.
 
 ## Rules
 - Contract-first: change API → regenerate client (scripts/gen-client.sh). Never edit web/src/api/.
