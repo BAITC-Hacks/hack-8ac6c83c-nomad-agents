@@ -14,7 +14,16 @@ export function AppShell({ actor, path, navigate, roleSwitcher, children }: {
   children: ReactNode;
 }) {
   const navLinks = actor ? links[actor.role] : [];
-  return <div className="app-frame">
+  return <div className="app-frame" onClickCapture={event => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const anchor = target.closest("a[href]") as HTMLAnchorElement | null;
+    if (!anchor || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || anchor.target && anchor.target !== "_self") return;
+    const destination = new URL(anchor.href, window.location.href);
+    if (destination.origin !== window.location.origin) return;
+    event.preventDefault();
+    navigate(`${destination.pathname}${destination.search}${destination.hash}`);
+  }}>
     <header className="topbar">
       <a href={actor?.role === "business" ? "/business/tasks" : "/catalog"} className="brand" onClick={(event) => {
         event.preventDefault(); navigate(actor?.role === "business" ? "/business/tasks" : "/catalog");
