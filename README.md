@@ -1,6 +1,9 @@
 # TaskForge — AI Challenge Coach
 
 Hackathon project by team Nomad Agents. Full target design lives in [`MVP_SPEC.md`](MVP_SPEC.md) (source of truth); this README documents what is actually implemented in this repository right now, plus the planned scope from the spec.
+<img width="1919" height="878" alt="image" src="https://github.com/user-attachments/assets/708a63d3-ff99-4ddc-b5bb-7626addd85c7" />
+
+
 
 ## 1. Project name
 
@@ -91,14 +94,6 @@ This starts the API (`localhost:8080`) and web dev server (`localhost:5173`). If
 
 ### Option B — Run services directly on the host
 Backend:
-# hack-8ac6c83c-nomad-agents
-Hackathon team repository for Nomad Agents
-
-## API baseline (B00)
-
-Requires the .NET 9 SDK for a host run, or Docker with Compose for a container run.
-From the repository root:
-
 ```sh
 dotnet build api/TaskForge.Api.csproj
 dotnet run --project api/TaskForge.Api.csproj
