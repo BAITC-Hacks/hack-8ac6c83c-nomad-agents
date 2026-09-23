@@ -2,6 +2,7 @@ namespace TaskForge.Api.Domain;
 
 public static class AiLogValidationValues
 {
+    public const string Invalid = "invalid";
     public const string Ok = "ok";
     public const string RetryOk = "retry-ok";
     public const string FallbackStub = "fallback-stub";

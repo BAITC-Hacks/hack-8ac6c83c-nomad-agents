@@ -1,5 +1,7 @@
 using TaskForge.Api.Features.Actors;
 using TaskForge.Api.Features.Health;
+using TaskForge.Api.Features.Ai;
+using TaskForge.Api.Infrastructure.OpenAi;
 using TaskForge.Api.Infrastructure.InMemory;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,6 +24,8 @@ builder.Services.AddSingleton<IProposalRepository, ProposalRepository>();
 builder.Services.AddSingleton<IAiLogRepository, AiLogRepository>();
 builder.Services.AddSingleton<IStoreAdminRepository, StoreAdminRepository>();
 builder.Services.AddSingleton<ActorGuard>();
+builder.Services.AddHttpClient<ResponsesClient>(client => client.Timeout = TimeSpan.FromSeconds(20));
+builder.Services.AddTransient<AnalysisService>();
 
 var app = builder.Build();
 
