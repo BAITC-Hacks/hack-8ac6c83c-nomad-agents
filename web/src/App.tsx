@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "./components/AppShell";
 import { RoleSwitcher } from "./components/RoleSwitcher";
 import { Toaster } from "./components/Toaster";
-import { useActor } from "./lib/actor";
-import { apiFetch, DEMO_EVENT, isDemoMode } from "./lib/http";
+import { restoreActor, useActor } from "./lib/actor";
+import { apiFetch } from "./lib/http";
 import NewTaskWizard from "./pages/business/NewTaskWizard";
 import MyTasks from "./pages/business/MyTasks";
 import TaskDetail from "./pages/business/TaskDetail";
@@ -26,13 +26,16 @@ function usePath() {
   return [path, navigate] as const;
 }
 export default function App() {
-  const { actor } = useActor();
+  const { actor, setActor } = useActor();
   const [actors, setActors] = useState<ActorsDto | null>(null);
   const [error, setError] = useState("");
   const [path, navigate] = usePath();
-  const [demo, setDemo] = useState(isDemoMode());
-  useEffect(() => { const update = () => setDemo(isDemoMode()); addEventListener(DEMO_EVENT, update); return () => removeEventListener(DEMO_EVENT, update); }, []);
-  useEffect(() => { apiFetch<ActorsDto>("/api/actors").then(setActors).catch(() => setError("Profiles could not be loaded.")); }, []);
+  useEffect(() => {
+    apiFetch<ActorsDto>("/api/actors").then(available => {
+      setActors(available);
+      setActor(restoreActor(available));
+    }).catch(() => setError("Profiles could not be loaded from the API."));
+  }, [setActor]);
   useEffect(() => {
     if (!actor) return;
     if (path === "/" || (actor.role === "business" && (path.startsWith("/team/") || path.startsWith("/catalog/"))) || (actor.role === "team" && path.startsWith("/business/"))) navigate(actor.role === "business" ? "/business/tasks" : "/catalog");
@@ -53,7 +56,6 @@ export default function App() {
     else page = <section className="page-card"><h1>Page not found</h1><a href={actor.role === "business" ? "/business/tasks" : "/catalog"}>Return to workspace</a></section>;
   }
   return <><AppShell actor={actor} path={path} navigate={navigate} roleSwitcher={<RoleSwitcher actors={actors} error={error} />}>
-    {demo && <div className="demo-banner" role="status"><strong>Sample workspace</strong> · API unavailable. Data and sample scores live only in this tab and reset on reload; they are not official ratings.</div>}
-    {page}
+    <div key={actor ? `${actor.role}:${actor.actorId}` : "no-actor"}>{page}</div>
   </AppShell><Toaster /></>;
 }

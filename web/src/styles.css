@@ -63,7 +63,6 @@ button, select { font: inherit; }
 .toast strong { color: #263044; font-size: 13px; }
 .toast small { margin-top: 5px; color: #727c8d; font-size: 12px; line-height: 1.45; }
 .toast button { margin: -4px -4px 0 auto; border: 0; background: transparent; color: #81899a; font-size: 21px; cursor: pointer; }
-.demo-banner { max-width: 1080px; margin: 0 auto 18px; padding: 12px 16px; border: 1px solid #f5d58a; border-radius: 10px; background: #fffbeb; color: #805c0a; font-size: 13px; }
 .content-page { max-width: 1000px; margin: auto; }
 .content-page h1 { margin-top: 0; }
 .content-page input:not([class]), .proposal-form input:not([class]), .proposal-form textarea, .review input:not([class]) { width: 100%; margin: 6px 0 13px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
