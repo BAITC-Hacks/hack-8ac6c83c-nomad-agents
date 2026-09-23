@@ -17,7 +17,13 @@ const ActorContext = createContext<{
 function loadActor(): Actor | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Actor) : null;
+    if (!raw) return null;
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== "object" || value === null) return null;
+    const candidate = value as Partial<Actor>;
+    return (candidate.role === "business" || candidate.role === "team") && typeof candidate.actorId === "string" && candidate.actorId
+      ? { role: candidate.role, actorId: candidate.actorId }
+      : null;
   } catch {
     return null;
   }

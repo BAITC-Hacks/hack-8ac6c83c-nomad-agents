@@ -17,6 +17,22 @@ export interface ProblemDetails {
   errors?: Record<string, string[]>;
 }
 
+export interface ApiToast {
+  title: string;
+  detail?: string;
+}
+
+export const API_TOAST_EVENT = "taskforge:api-toast";
+
+function notifyProblem(problem: ProblemDetails, status: number) {
+  const firstError = Object.values(problem.errors ?? {}).flat().find(Boolean);
+  const toast: ApiToast = {
+    title: problem.title || `Request failed (${status})`,
+    ...(firstError ? { detail: firstError } : {}),
+  };
+  window.dispatchEvent(new CustomEvent<ApiToast>(API_TOAST_EVENT, { detail: toast }));
+}
+
 export class ApiError extends Error {
   constructor(public problem: ProblemDetails, public status: number) {
     super(problem.title ?? `Request failed with status ${status}`);
@@ -41,6 +57,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     } catch {
       // no body
     }
+    notifyProblem(problem, res.status);
     throw new ApiError(problem, res.status);
   }
 
