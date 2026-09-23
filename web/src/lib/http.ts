@@ -57,8 +57,8 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     return demoRequest<T>(path, init.method ?? "GET", init.body, actor);
   }
 
-  // The scaffold API only exposes health. A missing actors route means its
-  // application contract is unavailable, so use one coherent local dataset.
+  // A missing actors route means the application contract is unavailable,
+  // so use one coherent local dataset.
   if (path === "/api/actors" && (res.status === 404 || res.status === 501)) {
     enableDemo();
     return demoRequest<T>(path, init.method ?? "GET", init.body, actor);

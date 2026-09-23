@@ -1,3 +1,4 @@
+using TaskForge.Api.Features.Actors;
 using TaskForge.Api.Features.Health;
 using TaskForge.Api.Infrastructure.InMemory;
 
@@ -15,6 +16,12 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<InMemoryDataStore>();
+builder.Services.AddSingleton<IActorRepository, ActorRepository>();
+builder.Services.AddSingleton<ITaskRepository, TaskRepository>();
+builder.Services.AddSingleton<IProposalRepository, ProposalRepository>();
+builder.Services.AddSingleton<IAiLogRepository, AiLogRepository>();
+builder.Services.AddSingleton<IStoreAdminRepository, StoreAdminRepository>();
+builder.Services.AddSingleton<ActorGuard>();
 
 var app = builder.Build();
 
@@ -26,7 +33,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 app.UseCors();
+app.UseMiddleware<ActorResolverMiddleware>();
 
 HealthEndpoints.MapHealthEndpoints(app);
+ActorEndpoints.MapActorEndpoints(app);
 
 app.Run();

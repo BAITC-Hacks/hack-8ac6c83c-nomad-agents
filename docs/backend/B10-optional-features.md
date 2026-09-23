@@ -15,4 +15,4 @@ Source: [MVP_SPEC.md](../../MVP_SPEC.md) §§2, 6–8. Begin only after the P0 i
 
 ## Contract and boundaries
 
-Each slice updates OpenAPI and triggers client regeneration through I0 before the corresponding UI is enabled. Build the API and run the slice's manual checks with the emulator. No automated tests. Coordinate domain/repository changes with B1, and do not independently rewrite B2–B6 or frontend files.
+Each slice updates OpenAPI and triggers client regeneration through I0 before the corresponding UI is enabled. Build the API and run the slice's manual checks in one local API process, including restart behavior where relevant. No automated tests. Coordinate domain/repository changes with B1, and do not independently rewrite B2–B6 or frontend files.

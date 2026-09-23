@@ -4,3 +4,12 @@ GET {{TaskForge.Api_HostAddress}}/api/health
 Accept: application/json
 
 ###
+
+GET {{TaskForge.Api_HostAddress}}/api/actors
+Accept: application/json
+
+###
+
+# Example headers for future protected routes:
+# X-Actor-Role: business
+# X-Actor-Id: b-nomad

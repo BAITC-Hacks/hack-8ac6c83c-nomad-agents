@@ -20,7 +20,7 @@ Replace the placeholder task endpoints with the complete business task journey: 
 
 ## Acceptance
 
-`dotnet build api/TaskForge.Api.csproj` passes. With seeded actors and emulator, manually create a weak draft, analyze, apply answers, retry the identical payload, and submit a different payload. Verify the retry leaves fields/revision unchanged and the changed payload returns `409`. Edit the card, confirm, improve it in the initial wizard, confirm again, and inspect previous/current score, delta, breakdown, quests, and level-up only if a threshold crossed. Publish, then check owner access and the catalog-safe confirmed view. A concurrent edit must cause stale confirm to return `409`.
+`dotnet build api/TaskForge.Api.csproj` passes. With seeded in-memory actors, manually create a weak draft, analyze, apply answers, retry the identical payload, and submit a different payload. Verify the retry leaves fields/revision unchanged and the changed payload returns `409`. Edit the card, confirm, improve it in the initial wizard, confirm again, and inspect previous/current score, delta, breakdown, quests, and level-up only if a threshold crossed. Publish, then check owner access and the catalog-safe confirmed view. A concurrent edit must cause stale confirm to return `409`.
 
 ## Boundary
 

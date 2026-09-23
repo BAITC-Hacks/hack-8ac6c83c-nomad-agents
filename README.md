@@ -19,10 +19,11 @@ Target users: businesses posting challenges for students (need help writing a cl
 
 ### Backend (`api/`) — .NET 9 Minimal API
 - Feature-folder structure per `MVP_SPEC.md` §3 (`api/Features/<Feature>/Endpoints.cs`, `Dtos.cs`).
-- **Implemented:** `GET /api/health` (`api/Features/Health/`) — returns API status and `storage: "in_memory"`.
-- OpenAPI/Swagger is wired up in Development (`http://localhost:8080/swagger/`, `http://localhost:8080/openapi/v1.json`); the generated document currently only lists `/api/health` because no other feature routes are mapped yet.
+- **Implemented:** `GET /api/health` and public `GET /api/actors`, which returns the three demo businesses and two teams used by the role switcher.
+- Protected API routes resolve `X-Actor-Role` and `X-Actor-Id` once per request. Missing/invalid headers return 400 ValidationProblem, unknown actors return 404, and role mismatches return 403. Reusable guards support business/team and task/proposal ownership checks.
+- OpenAPI/Swagger is wired up in Development (`http://localhost:8080/swagger/`, `http://localhost:8080/openapi/v1.json`); the generated document currently lists `/api/health` and `/api/actors`.
 - CORS is configurable via `CORS_ORIGINS`; the API binds via `ASPNETCORE_URLS`.
-- A singleton process-local store is registered for repositories. No OpenAI integration or task/catalog/proposal/rating endpoints exist in the backend yet.
+- The B1 domain and repository layer is implemented over the singleton store: actors, tasks, confirmed snapshots, ratings/history, proposals/milestones, and AI logs. It includes revision-safe task updates, atomic proposal/team point updates, and full reset support. No OpenAI integration or task/catalog/proposal/rating HTTP endpoints exist yet.
 
 ### Frontend (`web/`) — Vite + React + TypeScript
 All F0–F6 pages from `docs/tasks/frontend/` have been built as React pages/components:
@@ -35,7 +36,7 @@ All F0–F6 pages from `docs/tasks/frontend/` have been built as React pages/com
 - `Toaster` — error/toast notifications wired to API `ProblemDetails` responses.
 
 ### Key behavior actually implemented: automatic "Sample workspace" fallback
-Because the backend doesn't yet implement most routes, the frontend's fetch wrapper (`web/src/lib/http.ts`) detects a failed/missing API call (network error, or a 404/501 on `/api/actors`) and transparently switches into a **local demo mode** backed by `web/src/lib/demo.ts`. In this mode:
+The frontend's fetch wrapper (`web/src/lib/http.ts`) switches to a **local demo mode** when the API is unavailable or does not expose `/api/actors`. When the current B0 backend is running, real actor loading works; task/catalog/proposal routes remain unavailable until their backend briefs are implemented.
 - All data (businesses, teams, sample tasks, sample proposals, and a simplified sample scoring formula) lives in module memory and is seeded from hardcoded fixtures in `demo.ts`. Reloading clears changes.
 - The UI shows a banner on every page: *"Sample workspace · API unavailable. Data and sample scores live only in this tab and reset on reload; they are not official ratings."*
 - This lets every page (wizard, catalog, proposals, leaderboard, AI logs) be clicked through end-to-end today, without a running backend, but the scores and rules shown in that mode are **not** the deterministic rubric from `MVP_SPEC.md` §5.3 — they are a simplified placeholder heuristic (`sampleRating` in `demo.ts`), explicitly marked `ratingRulesVersion: "sample-only"`, with no language-accuracy guarantee.
@@ -74,7 +75,7 @@ Everything above runs entirely against the in-browser sample dataset today; ther
 Local dev: docker compose up --build  →  web (vite) + api (in-memory state)
 ```
 
-- `api/Features/<Feature>/` — one folder per backend feature (`Endpoints.cs`, `Dtos.cs`); only `Health` exists today.
+- `api/Features/<Feature>/` — one folder per backend feature (`Endpoints.cs`, `Dtos.cs`); `Health` and `Actors` exist today.
 - `api/Infrastructure/InMemory/` — singleton process-local state used by backend repositories; all state is cleared on API restart.
 - `web/src/components/`, `web/src/pages/` — UI building blocks and routed pages, driven by a hand-rolled path-based router in `web/src/App.tsx` (no routing library).
 - `web/src/lib/http.ts` — single fetch wrapper adding `X-Actor-Role`/`X-Actor-Id` headers and handling the API → sample-data fallback described in §3–4.
@@ -114,7 +115,7 @@ No credential file or API key is required to run what exists today.
 
 1. Start the stack with `docker compose up --build` (or run both services per Option B).
 2. Open `http://localhost:5173`.
-3. Because the backend does not yet implement `/api/actors`, the app automatically shows the **"Sample workspace"** banner and loads the built-in demo dataset — this is expected, not an error.
+3. To exercise the browser-only sample journey, run the frontend while the API is unavailable. With the API running, the real actor selector loads but later feature pages remain incomplete until B1–B8 are implemented.
 4. Pick **Tamaq Café Chain** (business) from the role switcher, go to *My Tasks* → *New task*, and paste a short weak draft (e.g. "We are a café chain. Customers stop coming back and we don't know why.").
 5. Step through the wizard: run Analyze, answer the sample clarification questions, edit the card, and confirm twice to see the sample score/level change.
 6. Publish the task and open the **Catalog** — the seeded Nomad Logistics (priority-level) and Steppe Retail (workable-level) cards provide a comparison alongside the one you just published.
@@ -130,12 +131,12 @@ No credential file or API key is required to run what exists today.
 
 ## 10. Limitations (current version)
 
-- **No real backend business logic.** Only `GET /api/health` is implemented; there are no working endpoints for tasks, analyze, answers, confirm, publish, catalog, proposals, decisions, milestones, leaderboard, or AI logs.
+- **Backend HTTP scope is currently B0; storage scope is B1.** Health, actor listing, actor resolution, access guards, domain records, and in-memory repositories work. Task, analyze, answers, confirm, publish, catalog, proposal, decision, milestone, leaderboard, and AI-log HTTP endpoints are not implemented.
 - **No durable persistence by design.** Backend data is process-local and is cleared by restart, redeployment, or scale-out to another instance.
 - **No OpenAI integration.** The "Analyze" step uses a hardcoded stub question template in the frontend, not a real AI call; no successful live AI response has been verified in this branch.
 - **No real deterministic rating engine.** The score shown in sample mode is a simplified placeholder heuristic in `web/src/lib/demo.ts`, explicitly not the rubric described in `MVP_SPEC.md` §5.3, and is not cached, versioned, or persisted server-side; it supports English rehearsal only, with no language-accuracy guarantee.
 - **No generated API client integration** — the current API contract exposes only the health route, so orval/OpenAPI client generation against real feature endpoints is pending.
-- **No authentication/authorization** beyond the header-based role switcher, and no server-side validation of actor identity since there is no backend to validate against yet.
+- **No authentication.** The server validates the demo actor headers and ownership helpers for correctness, but this role switcher mechanism is intentionally not secure identity.
 - **No seed data.** `seed/demo/` and `seed/full/` are empty placeholders.
 - **Data is non-durable by design** — API restart clears server state, and browser reload clears the fallback workspace and actor selection.
 - **No automated tests**, matching the project's stated hackathon scope.
