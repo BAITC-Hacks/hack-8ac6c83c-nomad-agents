@@ -35,10 +35,10 @@ A business rep types a weak task description → AI asks clarifying questions (w
 | 19 | Filters | Topic + readiness level (level is SoW-mandatory) |
 | 20 | Recommendations | Rule-based: team interest/tech tags ∩ task tags |
 | 21 | Proposal fields | Idea, plan, timeline, prototype link |
-| 22 | Duplicates | One proposal per team per task, editable while Pending |
+| 22 | Proposals | Any team may submit; one active proposal per team per task, editable while Pending. No cap across teams. |
 | 23 | Decision | Pending / Selected / Rejected, manual, reversible until milestone |
 | 24 | Milestones | Minimal: business confirms → +10 team points → leaderboard |
-| 25 | Seed | 3 businesses, 3 cards (full / medium / wizard-demo), 2 teams |
+| 25 | Seed | Demo: 3 businesses, 2 published cards plus live wizard demo, 2 teams; full: source-data minimums are preloaded |
 | 26 | Volume | Two seed profiles: `demo` and `full` (SoW 5× minimum) |
 | 27 | AI failure | Validate → 1 retry → local stub, flagged in UI |
 | 28 | Secrets | Local `.env` (gitignored) + committed `.env.example` |
@@ -51,10 +51,10 @@ A business rep types a weak task description → AI asks clarifying questions (w
 
 | # | Risk | Mitigation in this spec |
 |---|---|---|
-| R1 | **AI-scored rating vs. "transparent" (25 pts criterion).** LLM scores drift between identical inputs. | Per-criterion score + reason + missing details from AI; backend clamps to weight; empty fields forced to 0; SHA-256 cache of confirmed fields → identical card = identical score; rubric anchors in prompt. |
-| R2 | **"AI must not add facts."** Chips and extraction can smuggle invented facts. | Chips are *options the user picks*, never auto-inserted. Extracted draft values require an `evidence` substring that the backend verifies exists in the raw draft; failures are dropped. Suggestions are phrased as "Add X", never as content. |
+| R1 | **AI-scored rating vs. "transparent" (25 pts criterion).** LLM scores drift between identical inputs. | Per-criterion score + reason + missing details from AI; backend clamps to weight; empty fields forced to 0; versioned canonical-input cache → same inputs/model/rubric reuse the same score; rubric anchors in prompt. |
+| R2 | **"AI must not add facts."** Chips and extraction can smuggle invented facts. | Chips are options only and require user selection. Extraction is restricted to verbatim spans from the draft; backend verifies value/evidence correspondence and that evidence occurs in the raw draft. AI-generated titles require human review. |
 | R3 | **"Draft" naming collision.** Readiness level "Draft" (0–39) ≠ unpublished task. | Use `status: editing \| published` and `level: draft \| workable \| ready \| priority`. UI label for level draft: "Needs clarification". |
-| R4 | **Seed below SoW §6 minimum** (5 of each). | `full` seed profile pads to 5 drafts / 5 cards / 5 teams / 5 proposals. |
+| R4 | **Seed below SoW §6 minimum** (5 of each). | `full` contains at least 5 persisted drafts, complete cards, teams, and proposals immediately after seed; it never counts live wizard activity. |
 | R5 | **SoW requires readiness filter** — not only topic. | Both filters implemented. |
 | R6 | **Live demo depends on OpenAI latency/availability.** | Mini model, 20s timeout, stub fallback, `AI_MODE=stub` env override for offline. |
 | R7 | **4 h not 5 h; 2 devs not 3–5.** | Hard cut list in §13; code freeze at T+3:45. |
@@ -71,8 +71,8 @@ A business rep types a weak task description → AI asks clarifying questions (w
 - Task wizard: draft → AI analyze → answer questions → editable card → confirm → rating → publish
 - Rating panel: score, level, breakdown, missing details, delta vs. previous, next-level hint
 - Shared catalog: all published tasks, sort by rating, filters topic + level, priority highlighted, catalog position `#n of m`
-- Recommendations strip for teams (rule-based)
-- Proposals: submit/edit (one per team per task)
+- Recommendations strip for teams (rule-based on interests, skills, and technology tags; no sensitive participant attributes)
+- Proposals: submit/edit (one active proposal per team per task; unlimited teams may propose)
 - Business review: compare proposals, Select / Reject / Reset
 - Milestone confirmation → team points → leaderboard
 - Seed/reset endpoints (`demo`, `full`)
@@ -97,7 +97,7 @@ Local: docker compose → web (vite) + api + firestore-emulator
 
 - Frontend never touches Firestore. Firestore security rules: deny all client access.
 - API is stateless; all state in Firestore.
-- Actor identity via headers set by role switcher: `X-Actor-Role: business|team`, `X-Actor-Id: <id>`. API validates existence and ownership (not security, just correctness).
+- Demo actor identity via role-switcher headers `X-Actor-Role: business|team`, `X-Actor-Id: <id>`. Validate existence and ownership for correctness; this is not authentication. Public destructive admin operations are disabled or require a server-side secret.
 
 ### Repository layout
 
@@ -213,8 +213,9 @@ tasks/{taskId}
     extracted: [{ fieldKey, value, evidence }],
     source: "ai" | "stub", createdAt
   }
+  revision: int                             # incremented on every editable-field/answer mutation
   confirmed: {                             # snapshot at last confirm
-    fields: {...}, hash: string, confirmedAt
+    fields: {...}, hash: string, revision: int, confirmedAt
   } | null
   hasUnconfirmedChanges: bool
   rating: {
@@ -222,7 +223,7 @@ tasks/{taskId}
     breakdown: [{ criterion, weight, score, reason }],
     missingDetails: [{ criterion, detail }],
     source: "ai" | "stub" | "seed" | "cache",
-    scoredAt
+    cacheKey: string, scoredAt
   } | null
   ratingHistory: [{ total, level, scoredAt }]   # last 10, for delta display
   proposalCount: int
@@ -365,7 +366,9 @@ Return JSON matching the schema only.
 **Backend validation (`AnalyzeValidator`)**
 - `questions.Count` in [3, 7] → else invalid
 - each `chips.Count` ≤ 4 → truncate to 4 (soft fix), trim, dedupe, drop empty/ > 80 chars
-- `extracted[i].evidence` must be a case-insensitive substring of `rawDraft` → else drop item (log)
+- `extracted[i].evidence` must be a case-insensitive substring of `rawDraft`, and `value` must be copied from the evidenced source text (normalization only; no paraphrases or added details) → else drop item (log)
+- `title` is an untrusted suggestion: require business review/edit before confirm and publish
+- Prompt rule: title may only use words/facts supported by the draft; if unclear return empty. The wizard labels it as an AI suggestion and does not silently treat it as confirmed user text.
 - `suggestions` truncate to 6, drop empty
 - `title` > 120 chars → truncate
 - Assign `questions[i].id = "q{i+1}"`
@@ -437,7 +440,7 @@ Return JSON matching the schema only.
 2. `score = clamp(score, 0, weight)`.
 3. Apply empty rules from §4.2 (empty → 0; partial caps 10 / 5). Replace reason with "Field is empty" when forced.
 4. `total = Σ score`; `level` from §4.3.
-5. Cache: `hash = SHA256(normalized confirmed fields JSON)`. If `hash == task.confirmed.hash` and a rating exists → return cached (`source: "cache"`), no AI call.
+5. Cache key: SHA-256 of canonical normalized confirmed fields + rubric version + scoring mode/model version. Persist/reuse ratings by key so returning to an earlier revision reuses its result. Never reuse a `stub` result as an `ai` result; allow explicit rescore when live mode returns. Store cache key and source with each rating.
 6. Append to `ratingHistory` (keep last 10).
 
 ### 5.4 Failure handling (both calls)
@@ -453,8 +456,8 @@ parse + validate ──invalid──► retry once (same input, append "Previous
 ```
 
 **Stubs (deterministic)**
-- `AnalyzeStub`: for each empty field in priority order take a template question (table below), up to 5, min 3 (if fewer than 3 empty → ask to *specify* weakest by length); chips `[]`; suggestions = "Add {label}" for each empty field; extracted `[]`.
-- `ScoreStub`: per criterion, `score = weight × min(1, len(fieldsText)/threshold)` with threshold 200 chars (context/need, data), 120 (others); +20% if it contains a digit (successCriteria, constraints); clamp; then guard rules.
+- `AnalyzeStub`: ask about missing or weak fields in priority order, up to 5 and never fewer than 3. If fewer than 3 gaps exist, ask relevant specificity/confirmation questions about the weakest populated fields. Chips `[]`; suggestions = "Add {label}" for each gap; extracted `[]`.
+- `ScoreStub`: deterministic criterion-specific checks against rubric anchors (missing = 0; vague/general = at most half weight; concrete evidence for each rubric element = full weight). Do not award points for text length or digits alone. Return reasons and missing details from failed anchors, mark source `stub`, and show the basic-mode notice. Its result is illustrative and must not be described as AI scoring.
 
 | fieldKey | Stub question |
 |---|---|
@@ -489,7 +492,7 @@ published ──edit──► hasUnconfirmedChanges=true (catalog still shows LA
 - Publish requires: `title` non-empty, `rating != null`, no unconfirmed changes.
 
 ### 6.2 Answers → card merge
-`PUT /answers` with `[{ questionId, fieldKey, text }]`:
+`PUT /answers` with `[{ questionId, fieldKey, text }]` is idempotent by `questionId`: repeat submissions replace that answer's previous contribution rather than appending duplicates. Recompute the field from its original user value and current answers.
 - field empty → set to `text`
 - field non-empty → append `"\n" + text`
 - provenance: `chip` if text equals a chip exactly, else `user`
@@ -497,7 +500,7 @@ published ──edit──► hasUnconfirmedChanges=true (catalog still shows LA
 
 ### 6.3 Catalog
 - Source: `tasks where status == published`, loaded in memory.
-- Sort: `rating.total desc`, then `updatedAt desc`.
+- Sort: `rating.total desc`, then `confirmedAt desc` (or `publishedAt` before first confirmation), then stable task ID. Unconfirmed edits do not change catalog order.
 - Position: 1-based index in the **unfiltered** sorted list → `#n of m` (shown to business as gamification).
 - Filters: `topic` (task.topics contains, case-insensitive), `level` (multi). Filters apply after position computation.
 - Priority tasks: gold border + ★. Draft-level tasks: grey badge "Needs clarification".
@@ -513,7 +516,7 @@ return top 3 where interestHits + techHits > 0, with "why": matched tags
 Recommendations never filter the catalog; the full catalog is always shown below.
 
 ### 6.5 Proposals & decisions
-- Id `${taskId}_${teamId}` → upsert. Editable only while `pending`.
+- Id `${taskId}_${teamId}` → one active proposal per team per task, upsert. No cap across teams. Editable only while `pending`.
 - Validation: idea 20–2000, plan 20–3000, timeline 3–200, prototypeUrl valid `http(s)` URL or empty.
 - Allowed on any published task, any level.
 - Only the owning business can decide. Transitions: `pending ↔ selected`, `pending ↔ rejected`, `selected ↔ rejected`. Once a milestone is confirmed, decision is locked.
@@ -521,14 +524,14 @@ Recommendations never filter the catalog; the full catalog is always shown below
 - No automatic selection anywhere (SoW §3, §5).
 
 ### 6.6 Milestones & team points
-- Business on a `selected` proposal → "Confirm milestone" (title required) → `+10` to `teams.points` (Firestore transaction) and entry in `proposal.milestones`.
+- Business on a `selected` proposal → "Confirm milestone" (title required) → `+10` to `teams.points` and entry in `proposal.milestones`. Use a stable milestone ID and atomically create it only if absent while incrementing points, so retries/double clicks cannot award twice.
 - Leaderboard: teams sorted by `points desc`.
 
 ---
 
 ## 7. API specification
 
-All routes under `/api`. JSON. Errors = RFC 7807 `ProblemDetails` with `errors` map for validation. Headers `X-Actor-Role`, `X-Actor-Id` required except `/health`, `/admin/*`, `GET /actors`.
+All routes under `/api`. JSON. Errors = RFC 7807 `ProblemDetails` with `errors` map for validation. Headers `X-Actor-Role`, `X-Actor-Id` required except `/health`, `/admin/*`, `GET /actors`. Admin seed/reset mutations are local-only or protected by a server-side admin secret; never expose unauthenticated destructive admin routes publicly.
 
 | Method | Route | Actor | Body → Response |
 |---|---|---|---|
@@ -552,8 +555,8 @@ All routes under `/api`. JSON. Errors = RFC 7807 `ProblemDetails` with `errors` 
 | POST | `/proposals/{id}/milestones` | business owner | `{ title }` → `ProposalDto` |
 | GET | `/leaderboard` | any | `[{ teamId, name, points }]` |
 | GET | `/ai-logs?taskId=` | any | last 20 `AiLogDto` |
-| POST | `/admin/seed?profile=demo\|full` | — | wipes + loads seed |
-| POST | `/admin/reset` | — | wipe all collections |
+| POST | `/admin/seed?profile=demo\|full` | local/admin | wipes + loads seed |
+| POST | `/admin/reset` | local/admin | wipe all collections |
 
 **DTO sketches**
 ```ts
@@ -569,6 +572,8 @@ AnalysisDto { title:string;
   extracted:{fieldKey:string; value:string; evidence:string}[];
   source:'ai'|'stub' }
 ```
+
+Confirm/scoring is revision-safe: capture the edited task revision when scoring starts, then atomically save confirmed fields, canonical hash, rating, and `confirmedAt` only if the revision has not changed. If it changed, return a conflict and ask the business to confirm again. Catalog reads use only this committed snapshot.
 
 ---
 
@@ -629,6 +634,8 @@ Table: time, kind, task, model, validation result, latency. Expand row → syste
 
 ### 9.1 `demo` profile (`/seed/demo/`)
 
+`demo` is the short rehearsal profile and is not intended to meet source-data volume minimums. Use `full` for evaluation/submission; it satisfies all counts immediately after seeding.
+
 **businesses.json**
 | id | name | industry | Role in demo |
 |---|---|---|---|
@@ -636,20 +643,22 @@ Table: time, kind, task, model, validation result, latency. Expand row → syste
 | `b-steppe` | Steppe Retail | Retail | Medium card (Workable ~55) |
 | `b-tamaq` | Tamaq Café Chain | Food & Beverage | Live AI wizard demo (weak draft) |
 
-**tasks.json** (3 cards; ratings precomputed, `source:"seed"`)
+**tasks.json** (2 published cards; ratings precomputed, `source:"seed"`)
 1. **Nomad Logistics — "Delivery delay prediction dashboard"** — published, all fields rich: context (manual dispatching, 18% late deliveries), need, users (12 dispatchers), data (2 years of CSV route logs, ~400k rows, weather API), constraints (6 weeks, React/Python, read-only DB replica), expected result (web dashboard + delay model), success criteria (predict delays ≥30 min with ≥75% precision on holdout month), contact + weekly 30-min call + Slack feedback. Score **92 · priority**. topics: `logistics, data-analytics`; tech: `react, python, ml`.
 2. **Steppe Retail — "Customer review analysis"** — published, medium: context + need clear, data vague ("we have reviews"), expected result vague, no success criteria, users generic, contact only. Score **55 · workable**. topics: `retail, nlp`; tech: `dotnet, openai`.
-3. **Tamaq Café Chain** — **not pre-seeded as a card.** Its weak draft text lives in `drafts.json` and is typed/pasted live:
+3. **Tamaq Café Chain** — its weak draft text lives in `drafts.json` and is typed/pasted live:
    > "We are a café chain. Customers stop coming back and we don't know why. Want some app to fix it."
-   Expected wizard outcome: score ~20 → after answers ~60 → after one improvement round ~80+.
+Expected wizard outcome: low initial score, then a visible increase after confirmed additions. Exact scores depend on the selected AI/stub mode; use a prepared, manually verified fixture for any scripted numeric claims.
 
-   *(3rd card for the "3 cards" requirement = the Tamaq card created live; if a pre-built 3rd card is wanted for safety, seed `t-tamaq-backup` as `editing`, hidden from catalog.)*
+The `demo` profile may include a hidden editing backup card for rehearsal convenience; live creation does not count toward the `full` minimum.
 
 **teams.json**
 | id | name | interests | techTags |
 |---|---|---|---|
 | `t-bytenomads` | Byte Nomads | logistics, data-analytics, food | react, python, ml |
 | `t-nullptr` | Null Pointers | retail, nlp, food | dotnet, openai, react |
+
+Each team fixture also has a non-empty `skills` array, as required by the source-data profile definition.
 
 **proposals.json** (on Nomad task, to demo compare/select/reject)
 - `t-bytenomads` — pending — idea: ML model + dashboard, plan 4 sprints, timeline 5 weeks, link.
@@ -658,12 +667,12 @@ Table: time, kind, task, model, validation result, latency. Expand row → syste
 **drafts.json** — Tamaq weak draft (+ Steppe raw draft for reference).
 
 ### 9.2 `full` profile (`/seed/full/`) — SoW §6 minimum
-Everything in `demo`, plus:
+Includes `demo` content plus enough persisted records to contain at least 5 drafts, 5 complete task cards, 5 team profiles, and 5 proposals immediately after seed. Counts never depend on the live demo.
 - businesses: `b-kazagro` (Agriculture), `b-edutech` (Education)
-- tasks: Kazagro "Crop yield reporting" **~31 · draft**; EduTech "Student attendance insights" **~78 · ready** → 5 cards total (with Tamaq backup card counted when seeded as published, or 4 + Tamaq live = 5)
-- teams: `t-greenbits`, `t-pixelforge`, `t-dataweavers` → 5 teams
-- proposals: +3 (EduTech ← greenbits, Kazagro ← dataweavers, Steppe ← pixelforge) → 5
-- drafts.json: 5 drafts of varying completeness (very weak / weak / medium / good / complete)
+- tasks: Kazagro "Crop yield reporting" **~31 · draft**; EduTech "Student attendance insights" **~78 · ready**; plus `t-tamaq-backup` as a complete, confirmed editing card → at least 5 card documents with every rating field. This backup remains hidden from the catalog.
+- teams: `t-greenbits`, `t-pixelforge`, `t-dataweavers` → at least 5 teams, each with name, interests, skills, and technologies
+- proposals: +3 (EduTech ← greenbits, Kazagro ← dataweavers, Steppe ← pixelforge) → at least 5 proposals, each with team, idea, plan, timeline, and link field
+- drafts.json: at least 5 distinct drafts of varying completeness (very weak / weak / medium / good / complete)
 
 Seeded ratings are stored as-is (no AI call on seed). First edit+confirm triggers real scoring.
 
@@ -695,7 +704,9 @@ services:
     ports: ["8081:8080"]
 
   api:
-    build: ./api
+    build:
+      context: .
+      dockerfile: api/Dockerfile
     env_file: .env
     environment:
       FIRESTORE_EMULATOR_HOST: firestore:8080
@@ -732,7 +743,7 @@ ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "TaskForge.Api.dll"]
 ```
-*(Build context note: seed lives at repo root — either copy `seed/` into `api/` at build time via the deploy script, or set build context to repo root with `-f api/Dockerfile`.)*
+Docker Compose builds from repository root using `api/Dockerfile`, so `COPY seed ./seed` resolves to the checked-in root fixture directory. Cloud Run source deployment uses `api/` as its source root, so `scripts/deploy-api.sh` first stages fixtures into `api/seed/`; treat that directory as generated and gitignore it. The script updates the staging directory without deleting it first.
 
 ### 10.4 `scripts/deploy-api.sh`
 ```bash
@@ -745,20 +756,22 @@ REGION="europe-west1"
 SERVICE="taskforge-api"
 OPENAI_MODEL="REPLACE_WITH_CURRENT_MINI_MODEL"
 CORS_ORIGINS="https://your-site.netlify.app,http://localhost:5173"
+ADMIN_MUTATIONS_ENABLED="false"    # public deployment must not expose seed/reset
 ENV_FILE=".env"                  # OPENAI_API_KEY read from here
 # ================
 
 OPENAI_API_KEY="$(grep -E '^OPENAI_API_KEY=' "$ENV_FILE" | cut -d= -f2-)"
 [[ -z "$OPENAI_API_KEY" || "$OPENAI_API_KEY" == sk-REPLACE_ME ]] && { echo "Missing OPENAI_API_KEY in $ENV_FILE"; exit 1; }
 
-rm -rf api/seed && cp -r seed api/seed
+mkdir -p api/seed
+cp -r seed/. api/seed/
 
 gcloud config set project "$PROJECT_ID"
 gcloud run deploy "$SERVICE" \
   --source ./api \
   --region "$REGION" \
   --allow-unauthenticated \
-  --set-env-vars "GCP_PROJECT_ID=$PROJECT_ID,OPENAI_MODEL=$OPENAI_MODEL,AI_MODE=live,CORS_ORIGINS=$CORS_ORIGINS,OPENAI_API_KEY=$OPENAI_API_KEY"
+  --set-env-vars "GCP_PROJECT_ID=$PROJECT_ID,OPENAI_MODEL=$OPENAI_MODEL,AI_MODE=live,CORS_ORIGINS=$CORS_ORIGINS,ADMIN_MUTATIONS_ENABLED=$ADMIN_MUTATIONS_ENABLED,OPENAI_API_KEY=$OPENAI_API_KEY"
 
 gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)'
 ```
@@ -899,27 +912,12 @@ Each brief: goal · files to touch · DTOs/endpoints · acceptance checks (manua
 | S11 | Set `AI_MODE=stub`, restart, run S3–S4 | Template questions, amber "basic mode" badge, rule-based score |
 | S12 | Edit published task field, don't confirm | Catalog still shows old version; banner "Unconfirmed changes" |
 | S13 | AI logs page | analyze/score entries with prompt, input, raw output, validation status |
+| S14 | Force malformed AI output, then exhaust retry | One retry occurs, deterministic stub is used, source/badge and both log entries explain fallback |
+| S15 | Confirm a revision, edit and confirm another revision, then restore the original fields | Original cache key/result is reused; stub result is never returned as live AI scoring |
+| S16 | Submit the same answers twice; confirm the same milestone twice | Answer text is not duplicated; milestone awards team points once |
 
 ---
 
-## 15. 5-minute demo script (SoW §11)
-
-| Time | Actor | Action | Say |
-|---|---|---|---|
-| 0:00 | — | Catalog as Byte Nomads | "Rating = task readiness, not company fame. Priority on top, drafts visible but flagged." |
-| 0:30 | Tamaq | New task → paste weak draft → Analyze | "AI finds gaps and asks questions — it never invents facts." |
-| 1:15 | Tamaq | Pick chips + type 2 answers → Apply → Confirm | "Score 38 → Needs clarification. Breakdown shows exactly why." |
-| 2:00 | Tamaq | Improve: add data + success criteria → Confirm | "+30, now Ready. Rating recalculates on every confirmed change." |
-| 2:40 | Tamaq | Publish → catalog `#2 of 3` | "Higher rating = higher catalog position." |
-| 3:05 | Null Pointers | Recommended strip → open Tamaq → submit proposal | "Any team can propose; AI only recommends, never restricts." |
-| 3:45 | Tamaq | Proposals → Select Null Pointers | "The business decides. No automatic assignment." |
-| 4:05 | Nomad | Reject one, select other, confirm milestone → leaderboard | "Teams earn points for confirmed progress." |
-| 4:35 | — | AI logs row expanded | "Prompt, structured input/output, validation and fallback." |
-| 5:00 | — | End | |
-
-Backup: local `docker compose` with `AI_MODE=stub` ready in a second browser tab.
-
----
 
 ## 16. Evaluation mapping (SoW §9)
 

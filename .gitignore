@@ -1,0 +1,35 @@
+# Secrets & local environment
+.env
+.env.local
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build outputs
+bin/
+obj/
+dist/
+node_modules/
+*.pyc
+__pycache__/
+
+# Logs & temp
+*.log
+npm-debug.log*
+/tmp/
+
+# OS
+Thumbs.db
+
+# Generated client (regenerate via scripts/gen-client.sh)
+# /web/src/api/ is NOT in .gitignore — it's committed for CI/CD
+
+# Seed data & docs are committed
+# /seed/* — committed
+# /docs/* — committed
