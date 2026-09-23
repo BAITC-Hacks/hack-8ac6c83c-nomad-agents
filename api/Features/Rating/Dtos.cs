@@ -14,5 +14,13 @@ public sealed record RatingDto(
 {
     public static RatingDto FromDomain(RatingModel rating) => new(rating.Total, rating.Level,
         rating.Breakdown, rating.MissingDetails, rating.Quests, rating.Source, rating.RatingRulesVersion,
-        rating.ScoredAt, RatingService.NextLevel(rating.Total));
+        rating.ScoredAt, BuildNextLevel(rating.Total));
+
+    private static NextLevelDto? BuildNextLevel(int total) => total switch
+    {
+        < 40 => new(ReadinessLevels.Workable, 40 - total),
+        < 70 => new(ReadinessLevels.Ready, 70 - total),
+        < 90 => new(ReadinessLevels.Priority, 90 - total),
+        _ => null
+    };
 }

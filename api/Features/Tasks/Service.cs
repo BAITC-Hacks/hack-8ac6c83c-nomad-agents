@@ -14,7 +14,8 @@ public sealed record ServiceResult<T>(T? Value, int Status = 200,
     public bool Ok => Status is >= 200 and < 300;
 }
 
-public sealed class TaskService(ITaskRepository tasks, AnalysisService analysis, RatingService rating)
+public sealed class TaskService(ITaskRepository tasks, AnalysisService analysis, RatingService rating,
+    IRatingCacheRepository ratingCache)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly string[] FieldKeys =
@@ -127,14 +128,18 @@ public sealed class TaskService(ITaskRepository tasks, AnalysisService analysis,
         if (captured.BusinessId != businessId) return Forbidden<ConfirmTaskResponse>();
         var fieldErrors = ValidateFields(captured.Fields);
         if (fieldErrors.Count > 0) return Invalid<ConfirmTaskResponse>(fieldErrors);
-        var cacheKey = RatingService.CacheKey(captured.Fields);
+        var calculated = rating.Calculate(captured.Fields, DateTimeOffset.UtcNow);
+        var cacheKey = calculated.CacheKey;
         var unchanged = captured.Confirmed?.Hash == cacheKey && captured.Rating is not null;
         if (unchanged)
         {
-            var cached = captured.Rating! with { Source = RatingSources.Cache };
-            return new(new(TaskDto.Owner(captured, Position(captured)), RatingDto.FromDomain(cached), 0, Position(captured)));
+            var unchangedRating = captured.Rating! with { Source = RatingSources.Cache };
+            return new(new(TaskDto.Owner(captured, Position(captured)), RatingDto.FromDomain(unchangedRating), 0, Position(captured)));
         }
-        var scored = rating.ScoreFields(captured.Fields);
+        var cached = ratingCache.Get(cacheKey);
+        var scored = cached is not null
+            ? cached with { Source = RatingSources.Cache }
+            : ratingCache.GetOrAdd(calculated);
         var prior = captured.Rating;
         var history = captured.RatingHistory.Append(new RatingHistoryEntry(scored.Total, scored.Level, scored.ScoredAt)).TakeLast(10).ToArray();
         var snapshot = new ConfirmedTaskSnapshot(captured.Fields, cacheKey, captured.Revision, DateTimeOffset.UtcNow);
