@@ -1,6 +1,9 @@
 # TaskForge — AI Challenge Coach
 
 Hackathon project by team Nomad Agents. Full target design lives in [`MVP_SPEC.md`](MVP_SPEC.md) (source of truth); this README documents what is actually implemented in this repository right now, plus the planned scope from the spec.
+<img width="1919" height="878" alt="image" src="https://github.com/user-attachments/assets/708a63d3-ff99-4ddc-b5bb-7626addd85c7" />
+
+
 
 ## 1. Project name
 
